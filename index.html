@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>3D Signage Composer (v5.2 - Master Integration)</title>
+    <title>LUUX Mockup Generator (GitHub Auto-Load)</title>
     <style>
         body { 
             margin: 0; background-color: #000; color: #fff; overflow: hidden; font-family: 'Noto Sans KR', sans-serif;
@@ -84,7 +84,7 @@
 </head>
 <body id="body-zone">
 
-    <div id="drop-overlay"><div class="msg">에셋 일괄 로딩 중...</div></div>
+    <div id="drop-overlay"><div class="msg">에셋 추가 로딩 (Drag & Drop)</div></div>
 
     <div id="stage">
         <div id="bg-layer"></div>
@@ -100,9 +100,10 @@
     <div id="toast">메시지</div>
 
     <div id="ui-left" class="panel">
-        <h3>Master Asset Loading</h3>
+        <h3>Master Asset (Auto Loaded)</h3>
         <div class="master-load-box">
-            <div class="control-label" style="color:#4db8ff">Master GLB 또는 ZIP</div>
+            <div class="control-label" style="color:#aaa; font-size:11px;">서버에서 자동 로드됨:<br>Merged_Full_Format_v2.glb</div>
+            <div class="control-label" style="color:#4db8ff; margin-top:8px;">수동 교체 (Optional)</div>
             <input type="file" id="input-model-master" accept=".glb,.gltf,.zip">
         </div>
 
@@ -200,7 +201,7 @@
         </div>
 
         <div class="divider"></div>
-        <div style="font-size: 10px; color:#666; text-align: center;">2026 / LEE JUNGHO / ChannelA B&C / V5.2</div>
+        <div style="font-size: 10px; color:#666; text-align: center;">2026 / LEE JUNGHO / ChannelA B&C / V6.0 GitHub Edition</div>
     </div>
 
     <video id="video-source" autoplay muted loop playsinline style="display:none;"></video>
@@ -215,6 +216,16 @@
         const TARGET_ASPECT = 1.5;
         const stage = document.getElementById('stage'), container = document.getElementById('canvas-container');
 
+        // [Asset Config] GitHub 에셋 경로 설정
+        const ASSET_PATH = './assets/'; 
+        const MODEL_FILENAME = 'Merged_Full_Format_v2.glb';
+        const BG_FILES = {
+            front: 'bg_front.jpg',
+            back: 'bg_back.jpg',
+            frontSweetSpot: 'bg_sweet.jpg',
+            backNight: 'bg_night.jpg'
+        };
+
         function resizeStage() {
             const winW = window.innerWidth, winH = window.innerHeight;
             let w, h;
@@ -225,10 +236,9 @@
         window.addEventListener('resize', resizeStage);
 
         const scene = new THREE.Scene();
-        // [v5.2] 기본 렌더러 컬러 스페이스 설정 확인
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
         renderer.setPixelRatio(window.devicePixelRatio); 
-        renderer.outputColorSpace = THREE.SRGBColorSpace; // 감마 보정
+        renderer.outputColorSpace = THREE.SRGBColorSpace; 
         container.appendChild(renderer.domElement);
 
         const camera = new THREE.PerspectiveCamera(43.8, TARGET_ASPECT, 0.1, 10000);
@@ -282,9 +292,40 @@
             showToast(`Scene: ${type.toUpperCase()}`);
         };
 
-        // --- Drag & Drop Logic (v5.1 Stable Base) ---
-        const dropOverlay = document.getElementById('drop-overlay');
+        // --- GitHub Auto Load Logic ---
+        const textureLoader = new THREE.TextureLoader();
+        const gltfLoader = new GLTFLoader();
 
+        async function loadGitHubAssets() {
+            showToast("서버에서 에셋 로딩 중...");
+            
+            // 1. Load GLB
+            const modelUrl = ASSET_PATH + MODEL_FILENAME;
+            gltfLoader.load(modelUrl, (gltf) => {
+                slots.forEach(s => { if(s.root) scene.remove(s.root); });
+                slots[0].root = gltf.scene; scene.add(slots[0].root);
+                slots[1].root = gltf.scene.clone(); scene.add(slots[1].root);
+                applyMeshVisibility(0); applyMeshVisibility(1);
+                showToast("3D 모델 로딩 완료");
+            }, undefined, (err) => {
+                console.error(err);
+                showToast("모델을 찾을 수 없습니다: assets 폴더를 확인하세요.");
+            });
+
+            // 2. Load Backgrounds
+            for (const [key, fileName] of Object.entries(BG_FILES)) {
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                img.src = ASSET_PATH + fileName;
+                img.onload = () => {
+                    sceneData[key].bgImg = img;
+                    if (activeSceneType === key) updateBgDisplay();
+                };
+            }
+        }
+
+        // --- Drag & Drop Logic (Fallback) ---
+        const dropOverlay = document.getElementById('drop-overlay');
         window.addEventListener('dragover', (e) => { e.preventDefault(); dropOverlay.classList.add('active'); });
         window.addEventListener('dragleave', (e) => { e.preventDefault(); if (e.relatedTarget === null) dropOverlay.classList.remove('active'); });
         window.addEventListener('drop', async (e) => {
@@ -301,7 +342,6 @@
                 e.stopPropagation(); e.preventDefault();
                 el.classList.remove('active-drop');
                 dropOverlay.classList.remove('active'); 
-                
                 const file = e.dataTransfer.files[0];
                 if (file && file.type.startsWith('image/')) {
                     loadTextureToSlot(idx, file);
@@ -313,9 +353,7 @@
         async function handleBatchFiles(files) {
             for (const file of files) {
                 const name = file.name.toLowerCase();
-                // Junk Filter
                 if (name.startsWith('._') || name.startsWith('.') || name.includes('__macosx')) continue;
-
                 if (name.endsWith('.zip')) { await handleZipFile(file); }
                 else if (name.endsWith('.glb') || name.endsWith('.gltf')) { handleMasterGLB(file); }
                 else if (name.match(/\.(jpg|jpeg|png|webp)$/)) { classifyAndLoadImage(file); }
@@ -329,7 +367,6 @@
             for (const [path, zipEntry] of Object.entries(zip.files)) {
                 if (zipEntry.dir) continue;
                 if (path.includes('__MACOSX') || path.split('/').pop().startsWith('._')) continue;
-
                 const blob = await zipEntry.async("blob");
                 zipFiles.push(new File([blob], path.split('/').pop(), { type: getMimeType(path) }));
             }
@@ -356,7 +393,6 @@
             img.onload = () => { sceneData[sceneKey].bgImg = img; updateBgDisplay(); };
         }
 
-        const textureLoader = new THREE.TextureLoader();
         function loadTextureToSlot(idx, file) {
             textureLoader.load(URL.createObjectURL(file), (tex) => {
                 tex.colorSpace = THREE.SRGBColorSpace;
@@ -366,7 +402,6 @@
             });
         }
 
-        const gltfLoader = new GLTFLoader();
         function handleMasterGLB(file) {
             const url = URL.createObjectURL(file);
             gltfLoader.load(url, (gltf) => {
@@ -459,7 +494,6 @@
         document.getElementById('btn-wrap').onclick = () => { slots[activeModelIdx].config.wrap = !slots[activeModelIdx].config.wrap; updateMat(activeModelIdx); };
         document.getElementById('btn-reset-uv').onclick = () => { Object.assign(slots[activeModelIdx].config, {offsetU:0.00,offsetV:0,tilingU:1,tilingV:1,flipX:false,flipY:false,rot:0,wrap:false}); syncUI(); updateMat(activeModelIdx); };
 
-        // [v5.2] Save Logic: 다중 해상도 지원 및 감마 보정 적용
         async function renderHighRes() {
             const scaleOpt = document.getElementById('save-scale').value, curScene = sceneData[activeSceneType];
             let w = 3000, h = 2000;
@@ -467,7 +501,7 @@
             else if (scaleOpt === "2") { w = 6000; h = 4000; }
 
             const rt = new THREE.WebGLRenderTarget(w, h, { format: THREE.RGBAFormat });
-            rt.texture.colorSpace = THREE.SRGBColorSpace; // [핵심] 저장 시에도 색공간 유지
+            rt.texture.colorSpace = THREE.SRGBColorSpace; 
             
             const originalAspect = camera.aspect; camera.aspect = w / h; camera.updateProjectionMatrix();
             renderer.setRenderTarget(rt); renderer.clear(); renderer.render(scene, camera);
@@ -500,8 +534,16 @@
 
         window.closeMobileOverlay = () => document.getElementById('mobile-overlay').style.display = 'none';
         function showToast(m) { const t = document.getElementById('toast'); t.innerText = m; t.style.opacity = 1; setTimeout(() => t.style.opacity = 0, 3000); }
+        
         function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
-        switchScene('front'); animate();
+        
+        // --- Init ---
+        switchScene('front'); 
+        animate();
+
+        // Start Auto Load
+        window.addEventListener('load', loadGitHubAssets);
+
     </script>
 </body>
 </html>
