@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>3D Signage Composer (v5.2 - Master Integration)</title>
+    <style>
+        body { 
+            margin: 0; background-color: #000; color: #fff; overflow: hidden; font-family: 'Noto Sans KR', sans-serif;
+            display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw;
+        }
+        #stage {
+            position: relative; background-color: #111;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8); overflow: hidden;
+            background-image: linear-gradient(45deg, #1a1a1a 25%, transparent 25%), linear-gradient(-45deg, #1a1a1a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1a1a1a 75%), linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
+            background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+        #bg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; background-repeat: no-repeat; background-position: center center; background-size: 100% 100%; transition: opacity 0.2s; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+        canvas { display: block; width: 100%; height: 100%; }
+
+        #drop-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(77, 184, 255, 0.2); border: 5px dashed #4db8ff;
+            z-index: 2000; display: none; justify-content: center; align-items: center;
+            pointer-events: none; box-sizing: border-box;
+        }
+        #drop-overlay.active { display: flex; }
+        #drop-overlay .msg { background: #4db8ff; color: #000; padding: 20px 40px; border-radius: 50px; font-weight: bold; font-size: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+
+        .panel {
+            position: absolute; z-index: 100; background: rgba(20, 20, 20, 0.95); padding: 15px; border-radius: 8px;
+            border: 1px solid #444; width: 280px; backdrop-filter: blur(5px); max-height: 95vh; overflow-y: auto; font-size: 12px;
+        }
+        .panel::-webkit-scrollbar { width: 6px; }
+        .panel::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+        #ui-left { position: fixed; top: 20px; left: 20px; }
+        #ui-right { position: fixed; top: 20px; right: 20px; }
+
+        h3 { margin: 0 0 12px 0; font-size: 14px; color: #4db8ff; border-bottom: 1px solid #444; padding-bottom: 8px; font-weight: 700; text-transform: uppercase; }
+        .control-group { margin-bottom: 12px; }
+        .control-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; color: #aaa; }
+        input[type="file"], input[type="color"], select { width: 100%; background: #333; border: 1px solid #555; color: #fff; padding: 5px; border-radius: 4px; box-sizing: border-box; }
+        
+        .slider-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px;}
+        input[type="range"] { flex-grow: 1; height: 4px; background: #555; outline: none; -webkit-appearance: none; cursor: pointer; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: #4db8ff; border-radius: 50%; border: 2px solid #fff; }
+        input[type="number"] { width: 60px; background: #222; border: 1px solid #444; color: #ffd700; padding: 4px; border-radius: 4px; text-align: right; font-weight: bold; }
+
+        .btn-group { display: flex; gap: 5px; margin-top: 5px; }
+        button { flex: 1; padding: 8px; cursor: pointer; background: #333; border: 1px solid #555; color: #fff; border-radius: 4px; transition: 0.2s; font-weight: 600; }
+        button:hover { background: #444; }
+        button.active-btn { background: #4db8ff; color: #000; border-color: #fff; }
+
+        .save-area { margin-top: 15px; display: flex; flex-direction: column; gap: 8px; }
+        .save-btn-row { display: flex; gap: 5px; }
+        #btn-save-pc { background: linear-gradient(135deg, #4caf50, #2e7d32); border: none; }
+        #btn-save-mobile { background: linear-gradient(135deg, #2196F3, #1976D2); border: none; }
+
+        #mobile-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; display: none; flex-direction: column; justify-content: center; align-items: center; }
+        #mobile-overlay img { max-width: 90%; max-height: 80%; border: 2px solid #fff; }
+        #mobile-overlay .guide { margin-top: 15px; color: #fff; text-align: center; }
+        #mobile-overlay .close-btn { position: absolute; top: 20px; right: 20px; padding: 10px 20px; background: #f44336; color: #fff; border: none; border-radius: 5px; }
+
+        .tab-bar { display: flex; margin-bottom: 15px; border-bottom: 1px solid #444; }
+        .tab-btn { flex: 1; padding: 8px 2px; background: #222; border: none; color: #888; cursor: pointer; border-radius: 8px 8px 0 0; font-size: 10px; font-weight: bold; }
+        .tab-btn.active { background: #333; color: #4db8ff; border-bottom: 2px solid #4db8ff; }
+        .slot-files { display: none; }
+        .slot-files.active { display: block; }
+        .vis-label { font-size: 12px; display: flex; align-items: center; gap: 5px; color: #fff; cursor: pointer; margin-bottom: 10px; font-weight: bold;}
+
+        #cam-selector-ui { margin-top: 8px; display: none; padding: 8px; background: #222; border-radius: 4px; border: 1px solid #4db8ff; }
+        #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(76, 175, 80, 0.9); color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; opacity: 0; transition: opacity 0.5s; z-index: 200; pointer-events: none;}
+        
+        .master-load-box { background: rgba(77, 184, 255, 0.1); border: 1px dashed #4db8ff; padding: 10px; border-radius: 6px; margin-bottom: 10px; }
+        .texture-quick-box { display: flex; flex-direction: column; gap: 5px; margin-bottom: 15px; }
+        .tex-drop-slot { 
+            height: 45px; border: 1px solid #555; background: #222; border-radius: 4px;
+            display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px;
+            transition: 0.2s; cursor: copy; color: #888;
+        }
+        .tex-drop-slot.active-drop { border-color: #4db8ff; background: rgba(77, 184, 255, 0.2); color: #fff; }
+        .tex-drop-slot.has-file { border-color: #4caf50; background: rgba(76, 175, 80, 0.1); color: #4caf50; }
+    </style>
+</head>
+<body id="body-zone">
+
+    <div id="drop-overlay"><div class="msg">에셋 일괄 로딩 중...</div></div>
+
+    <div id="stage">
+        <div id="bg-layer"></div>
+        <div id="canvas-container"></div>
+    </div>
+
+    <div id="mobile-overlay">
+        <button class="close-btn" onclick="closeMobileOverlay()">닫기</button>
+        <img id="mobile-preview-img" src="" alt="Preview">
+        <div class="guide">이미지를 길게 눌러서<br>사진 앱에 저장하세요.</div>
+    </div>
+
+    <div id="toast">메시지</div>
+
+    <div id="ui-left" class="panel">
+        <h3>Master Asset Loading</h3>
+        <div class="master-load-box">
+            <div class="control-label" style="color:#4db8ff">Master GLB 또는 ZIP</div>
+            <input type="file" id="input-model-master" accept=".glb,.gltf,.zip">
+        </div>
+
+        <h3>Quick Texture Update</h3>
+        <div class="texture-quick-box">
+            <div id="tex-drop-0" class="tex-drop-slot">LUUX (A) Texture Drop</div>
+            <div id="tex-drop-1" class="tex-drop-slot">ILMIN (B) Texture Drop</div>
+        </div>
+
+        <h3>3D Configuration</h3>
+        <div class="tab-bar">
+            <button class="tab-btn active" id="m-tab-0" onclick="switchModelTab(0)">LUUX (A)</button>
+            <button class="tab-btn" id="m-tab-1" onclick="switchModelTab(1)">ILMIN (B)</button>
+        </div>
+
+        <div id="files-slot-0" class="slot-files active">
+            <label class="vis-label"><input type="checkbox" id="vis-chk-0" checked onchange="toggleModelVis(0)"> 👁️ LUUX Visibility</label>
+            <div class="control-label">Load Texture</div>
+            <input type="file" id="input-texture-0" accept="image/*">
+            <button id="btn-cam-0" style="margin-top:8px; width:100%;" onclick="toggleCamOverride(0)">📷 CAM Override</button>
+        </div>
+
+        <div id="files-slot-1" class="slot-files">
+            <label class="vis-label"><input type="checkbox" id="vis-chk-1" checked onchange="toggleModelVis(1)"> 👁️ ILMIN Visibility</label>
+            <div class="control-label">Load Texture</div>
+            <input type="file" id="input-texture-1" accept="image/*">
+            <button id="btn-cam-1" style="margin-top:8px; width:100%;" onclick="toggleCamOverride(1)">📷 CAM Override</button>
+        </div>
+
+        <div id="cam-selector-ui">
+            <div class="control-label">Select Video Source</div>
+            <select id="cam-device-select" onchange="changeCamSource()"></select>
+            <button style="margin-top:5px; background:#444;" onclick="closeCamSelector()">Close</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <h3>Material Settings</h3>
+        <div class="control-group">
+            <div class="control-label">Emission Intensity</div>
+            <div class="slider-row">
+                <input type="range" id="mat-emissive-slider" min="0" max="10" step="0.1" value="1.0">
+                <input type="number" id="mat-emissive-num" value="1.0" step="0.1">
+            </div>
+        </div>
+        <div class="control-group"><div class="control-label">Screen Tint</div><input type="color" id="mat-tint" value="#ffffff"></div>
+
+        <div class="divider"></div>
+
+        <h3>Texture UV (Current Slot)</h3>
+        <div class="control-group">
+            <div class="control-label">Offset U / V</div>
+            <div class="slider-row"><input type="range" id="uv-u-s" min="-1" max="1" step="0.01" value="0.00"><input type="number" id="uv-u-n" value="0.00" step="0.01"></div>
+            <div class="slider-row"><input type="range" id="uv-v-s" min="-1" max="1" step="0.01" value="0"><input type="number" id="uv-v-n" value="0.0" step="0.01"></div>
+        </div>
+        <div class="control-group">
+            <div class="control-label">Tiling U / V</div>
+            <div class="slider-row"><input type="range" id="uv-tile-u-s" min="0" max="2" step="0.01" value="1"><input type="number" id="uv-tile-u-n" value="1.0" step="0.01"></div>
+            <div class="slider-row"><input type="range" id="uv-tile-v-s" min="0" max="2" step="0.01" value="1"><input type="number" id="uv-tile-v-n" value="1.0" step="0.01"></div>
+        </div>
+
+        <div class="btn-group">
+            <button id="btn-flipX">Flip X</button><button id="btn-flipY">Flip Y</button><button id="btn-rotate">Rot 90°</button>
+        </div>
+        <div class="btn-group"><button id="btn-wrap">Wrap</button><button id="btn-reset-uv">Reset UV</button></div>
+
+        <div class="save-area">
+            <select id="save-scale">
+                <option value="1">3000 x 2000 px</option>
+                <option value="2">6000 x 4000 px</option>
+                <option value="original">Original (Full Size)</option>
+            </select>
+            <div class="save-btn-row">
+                <button id="btn-save-pc">💻 PC Save</button><button id="btn-save-mobile">📱 Mobile Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="ui-right" class="panel">
+        <h3>Scene Manager</h3>
+        <div class="tab-bar">
+            <button class="tab-btn active" id="s-tab-front" onclick="switchScene('front')">Front View</button>
+            <button class="tab-btn" id="s-tab-frontSweet" onclick="switchScene('frontSweetSpot')">Front SweetSpot</button>
+            <button class="tab-btn" id="s-tab-back" onclick="switchScene('back')">Back View</button>
+            <button class="tab-btn" id="s-tab-backNight" onclick="switchScene('backNight')">Back Night</button>
+        </div>
+
+        <label class="vis-label" style="margin-bottom: 15px;">
+            <input type="checkbox" id="bg-visible-chk" checked onchange="toggleBgVis()"> 👁️ Background (Active Scene)
+        </label>
+
+        <div class="control-group">
+            <div class="control-label">Load Background (View)</div>
+            <input type="file" id="input-bg" accept="image/*">
+        </div>
+
+        <div class="divider"></div>
+        <div style="font-size: 10px; color:#666; text-align: center;">2026 / LEE JUNGHO / ChannelA B&C / V5.2</div>
+    </div>
+
+    <video id="video-source" autoplay muted loop playsinline style="display:none;"></video>
+
+    <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/", "jszip": "https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm" } } </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import JSZip from 'jszip';
+
+        const TARGET_ASPECT = 1.5;
+        const stage = document.getElementById('stage'), container = document.getElementById('canvas-container');
+
+        function resizeStage() {
+            const winW = window.innerWidth, winH = window.innerHeight;
+            let w, h;
+            if (winW / winH > TARGET_ASPECT) { h = winH; w = winH * TARGET_ASPECT; } else { w = winW; h = winW / TARGET_ASPECT; }
+            stage.style.width = `${w}px`; stage.style.height = `${h}px`;
+            if (renderer && camera) { renderer.setSize(w, h); camera.aspect = TARGET_ASPECT; camera.updateProjectionMatrix(); }
+        }
+        window.addEventListener('resize', resizeStage);
+
+        const scene = new THREE.Scene();
+        // [v5.2] 기본 렌더러 컬러 스페이스 설정 확인
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+        renderer.setPixelRatio(window.devicePixelRatio); 
+        renderer.outputColorSpace = THREE.SRGBColorSpace; // 감마 보정
+        container.appendChild(renderer.domElement);
+
+        const camera = new THREE.PerspectiveCamera(43.8, TARGET_ASPECT, 0.1, 10000);
+        resizeStage();
+
+        scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); dirLight.position.set(5, 10, 7); scene.add(dirLight);
+
+        const slots = [
+            { root: null, targetMesh: null, texture: null, config: { prefix: 'LUUX', visible: true, emissive: 1.0, tint: '#ffffff', flipX: false, flipY: false, rot: 0, wrap: false, offsetU: 0.00, offsetV: 0, tilingU: 1.0, tilingV: 1.0, camOverride: false } },
+            { root: null, targetMesh: null, texture: null, config: { prefix: 'ILMIN', visible: true, emissive: 1.0, tint: '#ffffff', flipX: false, flipY: false, rot: 0, wrap: false, offsetU: 0.00, offsetV: 0, tilingU: 1.0, tilingV: 1.0, camOverride: false } }
+        ];
+
+        const sceneData = {
+            front: { suffix: 'Front', bgImg: null, bgVisible: true, fov: 52.4, pos: [-8.587, 1.4, 12.330], rot: [16.5, -39.5, 10.3] },
+            frontSweetSpot: { suffix: 'F_Sweet', bgImg: null, bgVisible: true, fov: 49.2, pos: [-7.243, -0.031, 12.760], rot: [22.3, -34.5, 13.1] },
+            back: { suffix: 'Back', bgImg: null, bgVisible: true, fov: 46.4, pos: [-9.869, 0.04, -9.425], rot: [-30.1, -130.95, -24.6] },
+            backNight: { suffix: 'B_Night', bgImg: null, bgVisible: true, fov: 47.9, pos: [-9.869, 0.04, -9.425], rot: [-29.3, -132.3, -21.9] }
+        };
+
+        let activeModelIdx = 0, activeSceneType = 'front';
+        let sharedVideoTexture = null;
+        const videoElement = document.getElementById('video-source');
+
+        function applyMeshVisibility(idx) {
+            const s = slots[idx]; if (!s.root) return;
+            const prefix = s.config.prefix;
+            const suffix = sceneData[activeSceneType].suffix;
+            s.targetMesh = null;
+            s.root.traverse(child => {
+                if (child.isMesh) {
+                    const isMatch = child.name.includes(prefix) && child.name.includes(suffix);
+                    child.visible = isMatch;
+                    if (isMatch) { s.targetMesh = child; if (child.material) child.material = child.material.clone(); }
+                }
+            });
+            if (s.targetMesh) updateMat(idx);
+        }
+
+        window.switchScene = (type) => {
+            activeSceneType = type;
+            const data = sceneData[type];
+            document.getElementById('s-tab-front').classList.toggle('active', type === 'front');
+            document.getElementById('s-tab-frontSweet').classList.toggle('active', type === 'frontSweetSpot');
+            document.getElementById('s-tab-back').classList.toggle('active', type === 'back');
+            document.getElementById('s-tab-backNight').classList.toggle('active', type === 'backNight');
+            camera.position.set(...data.pos); camera.rotation.set(data.rot[0]*Math.PI/180, data.rot[1]*Math.PI/180, data.rot[2]*Math.PI/180);
+            camera.fov = data.fov; camera.updateProjectionMatrix();
+            document.getElementById('bg-visible-chk').checked = data.bgVisible;
+            updateBgDisplay(); applyMeshVisibility(0); applyMeshVisibility(1);
+            showToast(`Scene: ${type.toUpperCase()}`);
+        };
+
+        // --- Drag & Drop Logic (v5.1 Stable Base) ---
+        const dropOverlay = document.getElementById('drop-overlay');
+
+        window.addEventListener('dragover', (e) => { e.preventDefault(); dropOverlay.classList.add('active'); });
+        window.addEventListener('dragleave', (e) => { e.preventDefault(); if (e.relatedTarget === null) dropOverlay.classList.remove('active'); });
+        window.addEventListener('drop', async (e) => {
+            e.preventDefault(); dropOverlay.classList.remove('active');
+            await handleBatchFiles(Array.from(e.dataTransfer.files));
+        });
+
+        // Texture Drop-Zones
+        [0, 1].forEach(idx => {
+            const el = document.getElementById(`tex-drop-${idx}`);
+            el.addEventListener('dragover', (e) => { e.stopPropagation(); e.preventDefault(); el.classList.add('active-drop'); });
+            el.addEventListener('dragleave', (e) => { e.stopPropagation(); e.preventDefault(); el.classList.remove('active-drop'); });
+            el.addEventListener('drop', async (e) => {
+                e.stopPropagation(); e.preventDefault();
+                el.classList.remove('active-drop');
+                dropOverlay.classList.remove('active'); 
+                
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    loadTextureToSlot(idx, file);
+                    el.classList.add('has-file');
+                }
+            });
+        });
+
+        async function handleBatchFiles(files) {
+            for (const file of files) {
+                const name = file.name.toLowerCase();
+                // Junk Filter
+                if (name.startsWith('._') || name.startsWith('.') || name.includes('__macosx')) continue;
+
+                if (name.endsWith('.zip')) { await handleZipFile(file); }
+                else if (name.endsWith('.glb') || name.endsWith('.gltf')) { handleMasterGLB(file); }
+                else if (name.match(/\.(jpg|jpeg|png|webp)$/)) { classifyAndLoadImage(file); }
+            }
+        }
+
+        async function handleZipFile(file) {
+            showToast("Unzipping assets...");
+            const zip = await JSZip.loadAsync(file);
+            const zipFiles = [];
+            for (const [path, zipEntry] of Object.entries(zip.files)) {
+                if (zipEntry.dir) continue;
+                if (path.includes('__MACOSX') || path.split('/').pop().startsWith('._')) continue;
+
+                const blob = await zipEntry.async("blob");
+                zipFiles.push(new File([blob], path.split('/').pop(), { type: getMimeType(path) }));
+            }
+            await handleBatchFiles(zipFiles);
+            showToast("Batch loading complete");
+        }
+
+        function getMimeType(path) {
+            const ext = path.split('.').pop().toLowerCase();
+            return { 'glb': 'model/gltf-binary', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png', 'webp': 'image/webp' }[ext] || '';
+        }
+
+        function classifyAndLoadImage(file) {
+            const name = file.name.toLowerCase();
+            if (name.includes('f_sweet')) loadBgToScene('frontSweetSpot', file);
+            else if (name.includes('b_night')) loadBgToScene('backNight', file);
+            else if (name.includes('front')) loadBgToScene('front', file);
+            else if (name.includes('back')) loadBgToScene('back', file);
+        }
+
+        async function loadBgToScene(sceneKey, file) {
+            const img = new Image();
+            img.src = URL.createObjectURL(file);
+            img.onload = () => { sceneData[sceneKey].bgImg = img; updateBgDisplay(); };
+        }
+
+        const textureLoader = new THREE.TextureLoader();
+        function loadTextureToSlot(idx, file) {
+            textureLoader.load(URL.createObjectURL(file), (tex) => {
+                tex.colorSpace = THREE.SRGBColorSpace;
+                slots[idx].texture = tex;
+                updateMat(idx);
+                showToast(`${slots[idx].config.prefix} Texture Updated`);
+            });
+        }
+
+        const gltfLoader = new GLTFLoader();
+        function handleMasterGLB(file) {
+            const url = URL.createObjectURL(file);
+            gltfLoader.load(url, (gltf) => {
+                slots.forEach(s => { if(s.root) scene.remove(s.root); });
+                slots[0].root = gltf.scene; scene.add(slots[0].root);
+                slots[1].root = gltf.scene.clone(); scene.add(slots[1].root);
+                applyMeshVisibility(0); applyMeshVisibility(1);
+                showToast("Master GLB Distributed");
+            });
+        }
+        document.getElementById('input-model-master').onchange = (e) => handleBatchFiles(Array.from(e.target.files));
+
+        // --- Standard Logic ---
+        window.toggleCamOverride = async (idx) => {
+            const slot = slots[idx]; slot.config.camOverride = !slot.config.camOverride;
+            if (slot.config.camOverride) {
+                try {
+                    await navigator.mediaDevices.getUserMedia({ video: true });
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    document.getElementById('cam-device-select').innerHTML = devices.filter(d => d.kind === 'videoinput').map(d => `<option value="${d.deviceId}">${d.label || 'Camera '+d.deviceId}</option>`).join('');
+                    document.getElementById('cam-selector-ui').style.display = 'block';
+                    if (!sharedVideoTexture) { sharedVideoTexture = new THREE.VideoTexture(videoElement); sharedVideoTexture.colorSpace = THREE.SRGBColorSpace; sharedVideoTexture.minFilter = THREE.LinearFilter; }
+                    videoElement.addEventListener('loadeddata', () => { updateMat(0); updateMat(1); }, { once: true });
+                    await changeCamSource(); 
+                } catch (err) { showToast("Camera access denied."); slot.config.camOverride = false; }
+            } else { if (!slots[0].config.camOverride && !slots[1].config.camOverride) { if (videoElement.srcObject) { videoElement.srcObject.getTracks().forEach(t => t.stop()); videoElement.srcObject = null; } document.getElementById('cam-selector-ui').style.display = 'none'; } updateMat(idx); }
+        };
+
+        window.changeCamSource = async () => {
+            const deviceId = document.getElementById('cam-device-select').value;
+            if (videoElement.srcObject) { videoElement.srcObject.getTracks().forEach(t => t.stop()); }
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: deviceId } } });
+            videoElement.srcObject = stream; await videoElement.play(); updateMat(0); updateMat(1);
+        };
+        window.closeCamSelector = () => document.getElementById('cam-selector-ui').style.display = 'none';
+
+        function updateMat(i) {
+            const s = slots[i]; if(!s.targetMesh) return;
+            const m = s.targetMesh.material;
+            let tex = s.config.camOverride ? sharedVideoTexture : s.texture;
+            if(tex) {
+                tex.flipY = false; tex.rotation = (s.config.rot * 90) * (Math.PI / 180); 
+                tex.offset.set(s.config.offsetU, s.config.offsetV);
+                tex.repeat.set(s.config.tilingU * (s.config.flipX ? -1 : 1), s.config.tilingV * (s.config.flipY ? -1 : 1));
+                tex.wrapS = tex.wrapT = s.config.wrap ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
+                m.map = tex; m.emissiveMap = tex; tex.needsUpdate = true;
+            } else { m.map = null; m.emissiveMap = null; }
+            m.emissive = new THREE.Color(s.config.tint); m.emissiveIntensity = s.config.emissive;
+            m.transparent = true; m.needsUpdate = true;
+        }
+
+        window.switchModelTab = (idx) => {
+            activeModelIdx = idx;
+            document.getElementById('m-tab-0').classList.toggle('active', idx === 0); document.getElementById('m-tab-1').classList.toggle('active', idx === 1);
+            document.getElementById('files-slot-0').classList.toggle('active', idx === 0); document.getElementById('files-slot-1').classList.toggle('active', idx === 1);
+            syncUI();
+        };
+
+        function syncUI() {
+            const cfg = slots[activeModelIdx].config;
+            const set = (id, v) => { document.getElementById(id+'-s').value = v; document.getElementById(id+'-n').value = v; };
+            set('uv-u', cfg.offsetU); set('uv-v', cfg.offsetV); set('uv-tile-u', cfg.tilingU); set('uv-tile-v', cfg.tilingV);
+            document.getElementById('mat-emissive-slider').value = cfg.emissive; document.getElementById('mat-emissive-num').value = cfg.emissive;
+            document.getElementById('mat-tint').value = cfg.tint;
+        }
+
+        window.toggleModelVis = (idx) => { slots[idx].config.visible = document.getElementById(`vis-chk-${idx}`).checked; if(slots[idx].root) slots[idx].root.visible = slots[idx].config.visible; };
+
+        document.getElementById('input-bg').onchange = (e) => classifyAndLoadImage(e.target.files[0]);
+        document.getElementById('input-texture-0').onchange = (e) => { if(e.target.files[0]) loadTextureToSlot(0, e.target.files[0]); };
+        document.getElementById('input-texture-1').onchange = (e) => { if(e.target.files[0]) loadTextureToSlot(1, e.target.files[0]); };
+
+        window.toggleBgVis = () => { sceneData[activeSceneType].bgVisible = document.getElementById('bg-visible-chk').checked; updateBgDisplay(); };
+        function updateBgDisplay() {
+            const data = sceneData[activeSceneType], layer = document.getElementById('bg-layer');
+            if (data.bgVisible && data.bgImg) { layer.style.backgroundImage = `url(${data.bgImg.src})`; layer.style.opacity = 1; }
+            else { layer.style.backgroundImage = 'none'; layer.style.opacity = 0; }
+        }
+
+        ['uv-u', 'uv-v', 'uv-tile-u', 'uv-tile-v'].forEach(id => {
+            const h = (e) => { slots[activeModelIdx].config[{'uv-u':'offsetU','uv-v':'offsetV','uv-tile-u':'tilingU','uv-tile-v':'tilingV'}[id]] = parseFloat(e.target.value); syncUI(); updateMat(activeModelIdx); };
+            document.getElementById(id+'-s').oninput = h; document.getElementById(id+'-n').oninput = h;
+        });
+        document.getElementById('mat-emissive-slider').oninput = (e) => { slots[activeModelIdx].config.emissive = parseFloat(e.target.value); updateMat(activeModelIdx); };
+        document.getElementById('mat-emissive-num').oninput = (e) => { document.getElementById('mat-emissive-slider').value = e.target.value; slots[activeModelIdx].config.emissive = parseFloat(e.target.value); updateMat(activeModelIdx); };
+        document.getElementById('mat-tint').oninput = (e) => { slots[activeModelIdx].config.tint = e.target.value; updateMat(activeModelIdx); };
+        document.getElementById('btn-flipX').onclick = () => { slots[activeModelIdx].config.flipX = !slots[activeModelIdx].config.flipX; updateMat(activeModelIdx); };
+        document.getElementById('btn-flipY').onclick = () => { slots[activeModelIdx].config.flipY = !slots[activeModelIdx].config.flipY; updateMat(activeModelIdx); };
+        document.getElementById('btn-rotate').onclick = () => { slots[activeModelIdx].config.rot = (slots[activeModelIdx].config.rot + 1) % 4; updateMat(activeModelIdx); };
+        document.getElementById('btn-wrap').onclick = () => { slots[activeModelIdx].config.wrap = !slots[activeModelIdx].config.wrap; updateMat(activeModelIdx); };
+        document.getElementById('btn-reset-uv').onclick = () => { Object.assign(slots[activeModelIdx].config, {offsetU:0.00,offsetV:0,tilingU:1,tilingV:1,flipX:false,flipY:false,rot:0,wrap:false}); syncUI(); updateMat(activeModelIdx); };
+
+        // [v5.2] Save Logic: 다중 해상도 지원 및 감마 보정 적용
+        async function renderHighRes() {
+            const scaleOpt = document.getElementById('save-scale').value, curScene = sceneData[activeSceneType];
+            let w = 3000, h = 2000;
+            if (scaleOpt === "original") { w = curScene.bgImg?.naturalWidth || 8256; h = curScene.bgImg?.naturalHeight || 5504; }
+            else if (scaleOpt === "2") { w = 6000; h = 4000; }
+
+            const rt = new THREE.WebGLRenderTarget(w, h, { format: THREE.RGBAFormat });
+            rt.texture.colorSpace = THREE.SRGBColorSpace; // [핵심] 저장 시에도 색공간 유지
+            
+            const originalAspect = camera.aspect; camera.aspect = w / h; camera.updateProjectionMatrix();
+            renderer.setRenderTarget(rt); renderer.clear(); renderer.render(scene, camera);
+            const buffer = new Uint8ClampedArray(w * h * 4); renderer.readRenderTargetPixels(rt, 0, 0, w, h, buffer);
+            renderer.setRenderTarget(null); camera.aspect = originalAspect; camera.updateProjectionMatrix(); rt.dispose();
+            
+            const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            if (curScene.bgVisible && curScene.bgImg) ctx.drawImage(curScene.bgImg, 0, 0, w, h);
+            
+            const tempCanvas = document.createElement('canvas'); tempCanvas.width = w; tempCanvas.height = h;
+            tempCanvas.getContext('2d').putImageData(new ImageData(buffer, w, h), 0, 0);
+            ctx.save(); ctx.scale(1, -1); ctx.drawImage(tempCanvas, 0, -h); ctx.restore();
+            return canvas.toDataURL('image/png');
+        }
+
+        document.getElementById('btn-save-pc').onclick = async () => {
+            const b = document.getElementById('btn-save-pc'); b.innerText = "⏳ Rendering...";
+            const dataUrl = await renderHighRes();
+            const link = document.createElement('a'); link.download = `Signage_${activeSceneType}_${Date.now()}.png`; link.href = dataUrl; link.click();
+            b.innerText = "💻 PC Save"; resizeStage();
+        };
+
+        document.getElementById('btn-save-mobile').onclick = async () => {
+            const b = document.getElementById('btn-save-mobile'); b.innerText = "⏳ Rendering...";
+            const dataUrl = await renderHighRes();
+            document.getElementById('mobile-preview-img').src = dataUrl; document.getElementById('mobile-overlay').style.display = 'flex';
+            b.innerText = "📱 Mobile Save"; resizeStage();
+        };
+
+        window.closeMobileOverlay = () => document.getElementById('mobile-overlay').style.display = 'none';
+        function showToast(m) { const t = document.getElementById('toast'); t.innerText = m; t.style.opacity = 1; setTimeout(() => t.style.opacity = 0, 3000); }
+        function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
+        switchScene('front'); animate();
+    </script>
+</body>
+</html>
