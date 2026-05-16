@@ -556,6 +556,40 @@
             <div class="hint">배경은 Three.js 카메라에 붙은 image plane으로 렌더링됩니다.</div>
         </div>
 
+        <div class="control-group">
+            <div class="control-label">
+                <span>Camera Zoom</span>
+                <span id="camera-zoom-readout">1.0x</span>
+            </div>
+            <div class="slider-row">
+                <input type="range" id="camera-zoom-slider" min="1" max="10" step="0.1" value="1">
+                <input class="num-small" type="number" id="camera-zoom-num" min="1" max="10" step="0.1" value="1.0">
+            </div>
+            <button id="btn-reset-camera-zoom" style="width:100%; margin-top:5px;">Reset Zoom</button>
+            <div id="camera-fov-status" class="hint">Current FOV: scene default</div>
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Lens Shift X</span>
+                <span id="lens-shift-x-readout">0</span>
+            </div>
+            <div class="slider-row">
+                <input type="range" id="lens-shift-x-slider" min="-100" max="100" step="1" value="0">
+                <input class="num-small" type="number" id="lens-shift-x-num" min="-100" max="100" step="1" value="0">
+            </div>
+            <div class="control-label" style="margin-top:7px;">
+                <span>Lens Shift Y</span>
+                <span id="lens-shift-y-readout">0</span>
+            </div>
+            <div class="slider-row">
+                <input type="range" id="lens-shift-y-slider" min="-100" max="100" step="1" value="0">
+                <input class="num-small" type="number" id="lens-shift-y-num" min="-100" max="100" step="1" value="0">
+            </div>
+            <button id="btn-reset-lens-shift" style="width:100%; margin-top:5px;">Reset Lens Shift</button>
+            <div id="lens-shift-status" class="hint">Projection offset: X 0 / Y 0</div>
+        </div>
+
         <div class="divider"></div>
 
         <h3>Video Export</h3>
@@ -614,9 +648,8 @@
 
         <div class="divider"></div>
         <div style="font-size: 10px; color:#666; text-align: center; line-height:1.45;">
-            LUUX Signage Simulation WebKit V7.1 Video / MP4 Export Edition
-            2026 / LEE JUNGHO / LUNARGRAPHICS /  ChannelA BNC<br>
-            Copyright(c) LEE JUNGHO. All rights reserved.
+            2026 / LEE JUNGHO / ChannelA B&amp;C<br>
+            V7.1 Video / MP4 Export Edition
         </div>
     </div>
 
@@ -769,6 +802,9 @@
 
         let activeModelIdx = 0;
         let activeSceneType = 'front';
+        let currentCameraZoom = 1.0;
+        let currentLensShiftX = 0;
+        let currentLensShiftY = 0;
         let bgMesh = null;
         let sharedVideoTexture = null;
         let isExporting = false;
@@ -838,7 +874,12 @@
 
             const data = sceneData[activeSceneType];
             const distance = Math.abs(bgMesh.position.z);
-            const vFov = THREE.MathUtils.degToRad(camera.fov);
+
+            // The background plane is calibrated to the scene default FOV.
+            // It must not be resized from the current zoomed camera.fov.
+            // Result: camera zoom affects the background and signage together, like optical zoom.
+            const baseFov = data.fov;
+            const vFov = THREE.MathUtils.degToRad(baseFov);
             const height = 2 * Math.tan(vFov / 2) * distance;
             const width = height * camera.aspect;
 
@@ -848,6 +889,99 @@
             bgMesh.material.needsUpdate = true;
             bgMesh.visible = !!(data.bgVisible && data.bgTexture);
         }
+
+        function getZoomedFov(baseFov, zoom) {
+            const safeZoom = Math.min(Math.max(parseFloat(zoom) || 1, 1), 10);
+            const baseRad = THREE.MathUtils.degToRad(baseFov);
+            const zoomedRad = 2 * Math.atan(Math.tan(baseRad / 2) / safeZoom);
+            return THREE.MathUtils.radToDeg(zoomedRad);
+        }
+
+        function updateCameraProjection() {
+            const baseFov = sceneData[activeSceneType].fov;
+            camera.fov = getZoomedFov(baseFov, currentCameraZoom);
+            camera.clearViewOffset();
+            camera.updateProjectionMatrix();
+
+            const size = new THREE.Vector2();
+            renderer.getSize(size);
+            const fullW = Math.max(1, Math.round(size.x));
+            const fullH = Math.max(1, Math.round(size.y));
+
+            const shiftScale = 0.005;
+            const offsetX = -currentLensShiftX * shiftScale * fullW;
+            const offsetY = currentLensShiftY * shiftScale * fullH;
+
+            if (currentLensShiftX !== 0 || currentLensShiftY !== 0) {
+                camera.setViewOffset(fullW, fullH, offsetX, offsetY, fullW, fullH);
+            }
+
+            camera.updateProjectionMatrix();
+            updateCameraZoomUI();
+            updateLensShiftUI();
+        }
+
+        function applyCameraZoom() {
+            // Do not resize the background plane here.
+            // Zoom and lens shift should affect the already-calibrated background plane optically.
+            updateCameraProjection();
+        }
+
+        function updateCameraZoomUI() {
+            const zoomText = `${currentCameraZoom.toFixed(1)}x`;
+            const slider = document.getElementById('camera-zoom-slider');
+            const num = document.getElementById('camera-zoom-num');
+            const readout = document.getElementById('camera-zoom-readout');
+            const status = document.getElementById('camera-fov-status');
+
+            if (slider) slider.value = currentCameraZoom;
+            if (num) num.value = currentCameraZoom.toFixed(1);
+            if (readout) readout.innerText = zoomText;
+            if (status) status.innerText = `Default FOV: ${sceneData[activeSceneType].fov.toFixed(1)}° / Current FOV: ${camera.fov.toFixed(2)}° / BG: default FOV locked`;
+        }
+
+        window.setCameraZoom = (value) => {
+            currentCameraZoom = Math.min(Math.max(parseFloat(value) || 1, 1), 10);
+            applyCameraZoom();
+        };
+
+        window.resetCameraZoom = () => {
+            currentCameraZoom = 1.0;
+            applyCameraZoom();
+            showToast('Camera zoom reset');
+        };
+
+        function updateLensShiftUI() {
+            const xSlider = document.getElementById('lens-shift-x-slider');
+            const ySlider = document.getElementById('lens-shift-y-slider');
+            const xNum = document.getElementById('lens-shift-x-num');
+            const yNum = document.getElementById('lens-shift-y-num');
+            const xReadout = document.getElementById('lens-shift-x-readout');
+            const yReadout = document.getElementById('lens-shift-y-readout');
+            const status = document.getElementById('lens-shift-status');
+
+            if (xSlider) xSlider.value = currentLensShiftX;
+            if (ySlider) ySlider.value = currentLensShiftY;
+            if (xNum) xNum.value = currentLensShiftX;
+            if (yNum) yNum.value = currentLensShiftY;
+            if (xReadout) xReadout.innerText = currentLensShiftX;
+            if (yReadout) yReadout.innerText = currentLensShiftY;
+            if (status) status.innerText = `Projection offset: X ${currentLensShiftX} / Y ${currentLensShiftY}`;
+        }
+
+        window.setLensShift = (axis, value) => {
+            const v = Math.min(Math.max(parseFloat(value) || 0, -100), 100);
+            if (axis === 'x') currentLensShiftX = v;
+            if (axis === 'y') currentLensShiftY = v;
+            updateCameraProjection();
+        };
+
+        window.resetLensShift = () => {
+            currentLensShiftX = 0;
+            currentLensShiftY = 0;
+            updateCameraProjection();
+            showToast('Lens shift reset');
+        };
 
         function applyMeshVisibility(idx) {
             const s = slots[idx];
@@ -888,11 +1022,9 @@
                 data.rot[1] * Math.PI / 180,
                 data.rot[2] * Math.PI / 180
             );
-            camera.fov = data.fov;
-            camera.updateProjectionMatrix();
-
             document.getElementById('bg-visible-chk').checked = data.bgVisible;
             updateCameraBackgroundPlane();
+            updateCameraProjection();
             applyMeshVisibility(0);
             applyMeshVisibility(1);
             showToast(`Scene: ${type}`);
@@ -1415,6 +1547,14 @@
         };
 
         document.getElementById('input-model-master').onchange = (e) => handleBatchFiles(Array.from(e.target.files));
+        document.getElementById('camera-zoom-slider').oninput = (e) => setCameraZoom(e.target.value);
+        document.getElementById('camera-zoom-num').oninput = (e) => setCameraZoom(e.target.value);
+        document.getElementById('btn-reset-camera-zoom').onclick = () => resetCameraZoom();
+        document.getElementById('lens-shift-x-slider').oninput = (e) => setLensShift('x', e.target.value);
+        document.getElementById('lens-shift-x-num').oninput = (e) => setLensShift('x', e.target.value);
+        document.getElementById('lens-shift-y-slider').oninput = (e) => setLensShift('y', e.target.value);
+        document.getElementById('lens-shift-y-num').oninput = (e) => setLensShift('y', e.target.value);
+        document.getElementById('btn-reset-lens-shift').onclick = () => resetLensShift();
         document.getElementById('input-bg').onchange = (e) => {
             if (e.target.files[0]) classifyAndLoadImage(e.target.files[0]);
         };
