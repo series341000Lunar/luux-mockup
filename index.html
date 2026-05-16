@@ -2,92 +2,414 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>LUUX Mockup Generator (GitHub Auto-Load)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LUUX Mockup Generator - Video Export Edition</title>
     <style>
-        body { 
-            margin: 0; background-color: #000; color: #fff; overflow: hidden; font-family: 'Noto Sans KR', sans-serif;
-            display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw;
+        :root {
+            --panel-bg: rgba(20, 20, 20, 0.95);
+            --line: #444;
+            --blue: #4db8ff;
+            --green: #4caf50;
+            --yellow: #ffd700;
+            --text: #fff;
+            --muted: #aaa;
         }
+
+        body {
+            margin: 0;
+            background-color: #000;
+            color: var(--text);
+            overflow: hidden;
+            font-family: 'Noto Sans KR', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+        }
+
         #stage {
-            position: relative; background-color: #111;
-            box-shadow: 0 0 50px rgba(0,0,0,0.8); overflow: hidden;
-            background-image: linear-gradient(45deg, #1a1a1a 25%, transparent 25%), linear-gradient(-45deg, #1a1a1a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1a1a1a 75%), linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
-            background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            position: relative;
+            background-color: #111;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            overflow: hidden;
+            background-image:
+                linear-gradient(45deg, #1a1a1a 25%, transparent 25%),
+                linear-gradient(-45deg, #1a1a1a 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #1a1a1a 75%),
+                linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
         }
-        #bg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; background-repeat: no-repeat; background-position: center center; background-size: 100% 100%; transition: opacity 0.2s; }
-        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
-        canvas { display: block; width: 100%; height: 100%; }
+
+        #canvas-container {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
 
         #drop-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(77, 184, 255, 0.2); border: 5px dashed #4db8ff;
-            z-index: 2000; display: none; justify-content: center; align-items: center;
-            pointer-events: none; box-sizing: border-box;
+            position: fixed;
+            inset: 0;
+            background: rgba(77, 184, 255, 0.2);
+            border: 5px dashed var(--blue);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+            box-sizing: border-box;
         }
+
         #drop-overlay.active { display: flex; }
-        #drop-overlay .msg { background: #4db8ff; color: #000; padding: 20px 40px; border-radius: 50px; font-weight: bold; font-size: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+
+        #drop-overlay .msg {
+            background: var(--blue);
+            color: #000;
+            padding: 20px 40px;
+            border-radius: 50px;
+            font-weight: 800;
+            font-size: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
 
         .panel {
-            position: absolute; z-index: 100; background: rgba(20, 20, 20, 0.95); padding: 15px; border-radius: 8px;
-            border: 1px solid #444; width: 280px; backdrop-filter: blur(5px); max-height: 95vh; overflow-y: auto; font-size: 12px;
+            position: absolute;
+            z-index: 100;
+            background: var(--panel-bg);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--line);
+            width: 300px;
+            backdrop-filter: blur(5px);
+            max-height: 95vh;
+            overflow-y: auto;
+            font-size: 12px;
+            box-sizing: border-box;
         }
+
         .panel::-webkit-scrollbar { width: 6px; }
         .panel::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+
         #ui-left { position: fixed; top: 20px; left: 20px; }
         #ui-right { position: fixed; top: 20px; right: 20px; }
 
-        h3 { margin: 0 0 12px 0; font-size: 14px; color: #4db8ff; border-bottom: 1px solid #444; padding-bottom: 8px; font-weight: 700; text-transform: uppercase; }
+        h3 {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            color: var(--blue);
+            border-bottom: 1px solid var(--line);
+            padding-bottom: 8px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .divider {
+            height: 1px;
+            background: var(--line);
+            margin: 14px 0;
+        }
+
         .control-group { margin-bottom: 12px; }
-        .control-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; color: #aaa; }
-        input[type="file"], input[type="color"], select { width: 100%; background: #333; border: 1px solid #555; color: #fff; padding: 5px; border-radius: 4px; box-sizing: border-box; }
-        
-        .slider-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px;}
-        input[type="range"] { flex-grow: 1; height: 4px; background: #555; outline: none; -webkit-appearance: none; cursor: pointer; }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: #4db8ff; border-radius: 50%; border: 2px solid #fff; }
-        input[type="number"] { width: 60px; background: #222; border: 1px solid #444; color: #ffd700; padding: 4px; border-radius: 4px; text-align: right; font-weight: bold; }
 
-        .btn-group { display: flex; gap: 5px; margin-top: 5px; }
-        button { flex: 1; padding: 8px; cursor: pointer; background: #333; border: 1px solid #555; color: #fff; border-radius: 4px; transition: 0.2s; font-weight: 600; }
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+            color: var(--muted);
+        }
+
+        .hint {
+            color: #777;
+            font-size: 10px;
+            line-height: 1.45;
+            margin-top: 5px;
+        }
+
+        input[type="file"], input[type="color"], select, input[type="number"] {
+            width: 100%;
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            padding: 6px;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        input[type="number"] {
+            color: var(--yellow);
+            text-align: right;
+            font-weight: 800;
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 5px;
+        }
+
+        input[type="range"] {
+            flex-grow: 1;
+            height: 4px;
+            background: #555;
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            background: var(--blue);
+            border-radius: 50%;
+            border: 2px solid #fff;
+        }
+
+        .num-small { width: 66px !important; }
+
+        .btn-group {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+
+        button {
+            flex: 1;
+            padding: 8px;
+            cursor: pointer;
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            border-radius: 4px;
+            transition: 0.15s;
+            font-weight: 700;
+        }
+
         button:hover { background: #444; }
-        button.active-btn { background: #4db8ff; color: #000; border-color: #fff; }
+        button:disabled { opacity: 0.45; cursor: not-allowed; }
+        button.active-btn { background: var(--blue); color: #000; border-color: #fff; }
 
-        .save-area { margin-top: 15px; display: flex; flex-direction: column; gap: 8px; }
+        .primary-green { background: linear-gradient(135deg, #4caf50, #2e7d32); border: none; }
+        .primary-blue { background: linear-gradient(135deg, #2196F3, #1976D2); border: none; }
+        .primary-red { background: linear-gradient(135deg, #f44336, #b71c1c); border: none; }
+        .primary-purple { background: linear-gradient(135deg, #8e44ad, #5e3370); border: none; }
+
+        .save-area {
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
         .save-btn-row { display: flex; gap: 5px; }
-        #btn-save-pc { background: linear-gradient(135deg, #4caf50, #2e7d32); border: none; }
-        #btn-save-mobile { background: linear-gradient(135deg, #2196F3, #1976D2); border: none; }
 
-        #mobile-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; display: none; flex-direction: column; justify-content: center; align-items: center; }
-        #mobile-overlay img { max-width: 90%; max-height: 80%; border: 2px solid #fff; }
-        #mobile-overlay .guide { margin-top: 15px; color: #fff; text-align: center; }
-        #mobile-overlay .close-btn { position: absolute; top: 20px; right: 20px; padding: 10px 20px; background: #f44336; color: #fff; border: none; border-radius: 5px; }
+        #mobile-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
 
-        .tab-bar { display: flex; margin-bottom: 15px; border-bottom: 1px solid #444; }
-        .tab-btn { flex: 1; padding: 8px 2px; background: #222; border: none; color: #888; cursor: pointer; border-radius: 8px 8px 0 0; font-size: 10px; font-weight: bold; }
-        .tab-btn.active { background: #333; color: #4db8ff; border-bottom: 2px solid #4db8ff; }
+        #mobile-overlay img {
+            max-width: 90%;
+            max-height: 80%;
+            border: 2px solid #fff;
+        }
+
+        #mobile-overlay .guide {
+            margin-top: 15px;
+            color: #fff;
+            text-align: center;
+        }
+
+        #mobile-overlay .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: #f44336;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+        }
+
+        .tab-bar {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 8px 2px;
+            background: #222;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        .tab-btn.active {
+            background: #333;
+            color: var(--blue);
+            border-bottom: 2px solid var(--blue);
+        }
+
         .slot-files { display: none; }
         .slot-files.active { display: block; }
-        .vis-label { font-size: 12px; display: flex; align-items: center; gap: 5px; color: #fff; cursor: pointer; margin-bottom: 10px; font-weight: bold;}
 
-        #cam-selector-ui { margin-top: 8px; display: none; padding: 8px; background: #222; border-radius: 4px; border: 1px solid #4db8ff; }
-        #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(76, 175, 80, 0.9); color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; opacity: 0; transition: opacity 0.5s; z-index: 200; pointer-events: none;}
-        
-        .master-load-box { background: rgba(77, 184, 255, 0.1); border: 1px dashed #4db8ff; padding: 10px; border-radius: 6px; margin-bottom: 10px; }
-        .texture-quick-box { display: flex; flex-direction: column; gap: 5px; margin-bottom: 15px; }
-        .tex-drop-slot { 
-            height: 45px; border: 1px solid #555; background: #222; border-radius: 4px;
-            display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px;
-            transition: 0.2s; cursor: copy; color: #888;
+        .vis-label {
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: #fff;
+            cursor: pointer;
+            margin-bottom: 10px;
+            font-weight: 800;
         }
-        .tex-drop-slot.active-drop { border-color: #4db8ff; background: rgba(77, 184, 255, 0.2); color: #fff; }
-        .tex-drop-slot.has-file { border-color: #4caf50; background: rgba(76, 175, 80, 0.1); color: #4caf50; }
+
+        #cam-selector-ui {
+            margin-top: 8px;
+            display: none;
+            padding: 8px;
+            background: #222;
+            border-radius: 4px;
+            border: 1px solid var(--blue);
+        }
+
+        #toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(76, 175, 80, 0.92);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: 800;
+            opacity: 0;
+            transition: opacity 0.35s;
+            z-index: 3000;
+            pointer-events: none;
+            max-width: 70vw;
+            text-align: center;
+        }
+
+        .master-load-box {
+            background: rgba(77, 184, 255, 0.1);
+            border: 1px dashed var(--blue);
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+
+        .texture-quick-box {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+
+        .tex-drop-slot {
+            height: 45px;
+            border: 1px solid #555;
+            background: #222;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 11px;
+            transition: 0.15s;
+            cursor: copy;
+            color: #888;
+            text-align: center;
+        }
+
+        .tex-drop-slot.active-drop {
+            border-color: var(--blue);
+            background: rgba(77, 184, 255, 0.2);
+            color: #fff;
+        }
+
+        .tex-drop-slot.has-file {
+            border-color: var(--green);
+            background: rgba(76, 175, 80, 0.1);
+            color: var(--green);
+        }
+
+        .status-box {
+            background: #1d1d1d;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 7px;
+            color: #aaa;
+            line-height: 1.45;
+            font-size: 10px;
+            margin-top: 6px;
+            word-break: break-all;
+        }
+
+        .status-box strong { color: var(--blue); }
+
+        .transport-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 7px;
+        }
+
+        .transport-row button {
+            flex: 0 0 72px;
+            padding: 7px 6px;
+        }
+
+        .transport-row input[type="range"] {
+            flex: 1;
+        }
+
+        .time-readout {
+            margin-top: 4px;
+            color: #888;
+            font-size: 10px;
+            line-height: 1.35;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .audio-option {
+            margin-top: 8px;
+            padding: 8px;
+            background: #1d1d1d;
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body id="body-zone">
 
-    <div id="drop-overlay"><div class="msg">에셋 추가 로딩 (Drag & Drop)</div></div>
+    <div id="drop-overlay"><div class="msg">에셋 추가 로딩 / Texture & Video Drop</div></div>
 
     <div id="stage">
-        <div id="bg-layer"></div>
         <div id="canvas-container"></div>
     </div>
 
@@ -100,17 +422,20 @@
     <div id="toast">메시지</div>
 
     <div id="ui-left" class="panel">
-        <h3>Master Asset (Auto Loaded)</h3>
+        <h3>Master Asset</h3>
         <div class="master-load-box">
-            <div class="control-label" style="color:#aaa; font-size:11px;">서버에서 자동 로드됨:<br>Merged_Full_Format_v2.glb</div>
-            <div class="control-label" style="color:#4db8ff; margin-top:8px;">수동 교체 (Optional)</div>
+            <div class="control-label" style="color:#aaa; font-size:11px; display:block; line-height:1.45;">
+                서버 자동 로드:<br>
+                <strong>Merged_Full_Format_v2.glb</strong>
+            </div>
+            <div class="control-label" style="color:#4db8ff; margin-top:8px;">수동 교체</div>
             <input type="file" id="input-model-master" accept=".glb,.gltf,.zip">
         </div>
 
-        <h3>Quick Texture Update</h3>
+        <h3>Quick Media Update</h3>
         <div class="texture-quick-box">
-            <div id="tex-drop-0" class="tex-drop-slot">LUUX (A) Texture Drop</div>
-            <div id="tex-drop-1" class="tex-drop-slot">ILMIN (B) Texture Drop</div>
+            <div id="tex-drop-0" class="tex-drop-slot">LUUX (A)<br>Image / Video Drop</div>
+            <div id="tex-drop-1" class="tex-drop-slot">ILMIN (B)<br>Image / Video Drop</div>
         </div>
 
         <h3>3D Configuration</h3>
@@ -121,22 +446,40 @@
 
         <div id="files-slot-0" class="slot-files active">
             <label class="vis-label"><input type="checkbox" id="vis-chk-0" checked onchange="toggleModelVis(0)"> 👁️ LUUX Visibility</label>
-            <div class="control-label">Load Texture</div>
-            <input type="file" id="input-texture-0" accept="image/*">
-            <button id="btn-cam-0" style="margin-top:8px; width:100%;" onclick="toggleCamOverride(0)">📷 CAM Override</button>
+            <div class="control-label">Load Screen Media</div>
+            <input type="file" id="input-media-0" accept="image/*,video/*">
+            <div id="media-status-0" class="status-box">No media loaded.</div>
+            <div class="transport-row">
+                <button id="btn-media-play-0" onclick="toggleSlotPlayback(0)" disabled>▶ Play</button>
+                <input type="range" id="media-seek-0" min="0" max="1000" step="1" value="0" oninput="seekSlotPreview(0, this.value)" disabled>
+            </div>
+            <div id="media-time-0" class="time-readout">00:00 / 00:00</div>
+            <div class="btn-group">
+                <button id="btn-cam-0" onclick="toggleCamOverride(0)">📷 CAM</button>
+                <button onclick="clearSlotMedia(0)">Clear</button>
+            </div>
         </div>
 
         <div id="files-slot-1" class="slot-files">
             <label class="vis-label"><input type="checkbox" id="vis-chk-1" checked onchange="toggleModelVis(1)"> 👁️ ILMIN Visibility</label>
-            <div class="control-label">Load Texture</div>
-            <input type="file" id="input-texture-1" accept="image/*">
-            <button id="btn-cam-1" style="margin-top:8px; width:100%;" onclick="toggleCamOverride(1)">📷 CAM Override</button>
+            <div class="control-label">Load Screen Media</div>
+            <input type="file" id="input-media-1" accept="image/*,video/*">
+            <div id="media-status-1" class="status-box">No media loaded.</div>
+            <div class="transport-row">
+                <button id="btn-media-play-1" onclick="toggleSlotPlayback(1)" disabled>▶ Play</button>
+                <input type="range" id="media-seek-1" min="0" max="1000" step="1" value="0" oninput="seekSlotPreview(1, this.value)" disabled>
+            </div>
+            <div id="media-time-1" class="time-readout">00:00 / 00:00</div>
+            <div class="btn-group">
+                <button id="btn-cam-1" onclick="toggleCamOverride(1)">📷 CAM</button>
+                <button onclick="clearSlotMedia(1)">Clear</button>
+            </div>
         </div>
 
         <div id="cam-selector-ui">
             <div class="control-label">Select Video Source</div>
             <select id="cam-device-select" onchange="changeCamSource()"></select>
-            <button style="margin-top:5px; background:#444;" onclick="closeCamSelector()">Close</button>
+            <button style="margin-top:5px; background:#444; width:100%;" onclick="closeCamSelector()">Close</button>
         </div>
 
         <div class="divider"></div>
@@ -146,38 +489,50 @@
             <div class="control-label">Emission Intensity</div>
             <div class="slider-row">
                 <input type="range" id="mat-emissive-slider" min="0" max="10" step="0.1" value="1.0">
-                <input type="number" id="mat-emissive-num" value="1.0" step="0.1">
+                <input class="num-small" type="number" id="mat-emissive-num" value="1.0" step="0.1">
             </div>
         </div>
-        <div class="control-group"><div class="control-label">Screen Tint</div><input type="color" id="mat-tint" value="#ffffff"></div>
+        <div class="control-group">
+            <div class="control-label">Screen Tint</div>
+            <input type="color" id="mat-tint" value="#ffffff">
+        </div>
 
         <div class="divider"></div>
 
-        <h3>Texture UV (Current Slot)</h3>
+        <h3>Texture UV</h3>
         <div class="control-group">
             <div class="control-label">Offset U / V</div>
-            <div class="slider-row"><input type="range" id="uv-u-s" min="-1" max="1" step="0.01" value="0.00"><input type="number" id="uv-u-n" value="0.00" step="0.01"></div>
-            <div class="slider-row"><input type="range" id="uv-v-s" min="-1" max="1" step="0.01" value="0"><input type="number" id="uv-v-n" value="0.0" step="0.01"></div>
+            <div class="slider-row"><input type="range" id="uv-u-s" min="-1" max="1" step="0.01" value="0.00"><input class="num-small" type="number" id="uv-u-n" value="0.00" step="0.01"></div>
+            <div class="slider-row"><input type="range" id="uv-v-s" min="-1" max="1" step="0.01" value="0"><input class="num-small" type="number" id="uv-v-n" value="0.0" step="0.01"></div>
         </div>
         <div class="control-group">
             <div class="control-label">Tiling U / V</div>
-            <div class="slider-row"><input type="range" id="uv-tile-u-s" min="0" max="2" step="0.01" value="1"><input type="number" id="uv-tile-u-n" value="1.0" step="0.01"></div>
-            <div class="slider-row"><input type="range" id="uv-tile-v-s" min="0" max="2" step="0.01" value="1"><input type="number" id="uv-tile-v-n" value="1.0" step="0.01"></div>
+            <div class="slider-row"><input type="range" id="uv-tile-u-s" min="0" max="2" step="0.01" value="1"><input class="num-small" type="number" id="uv-tile-u-n" value="1.0" step="0.01"></div>
+            <div class="slider-row"><input type="range" id="uv-tile-v-s" min="0" max="2" step="0.01" value="1"><input class="num-small" type="number" id="uv-tile-v-n" value="1.0" step="0.01"></div>
         </div>
 
         <div class="btn-group">
-            <button id="btn-flipX">Flip X</button><button id="btn-flipY">Flip Y</button><button id="btn-rotate">Rot 90°</button>
+            <button id="btn-flipX">Flip X</button>
+            <button id="btn-flipY">Flip Y</button>
+            <button id="btn-rotate">Rot 90°</button>
         </div>
-        <div class="btn-group"><button id="btn-wrap">Wrap</button><button id="btn-reset-uv">Reset UV</button></div>
+        <div class="btn-group">
+            <button id="btn-wrap">Wrap</button>
+            <button id="btn-reset-uv">Reset UV</button>
+        </div>
 
+        <div class="divider"></div>
+
+        <h3>PNG Save</h3>
         <div class="save-area">
             <select id="save-scale">
                 <option value="1">3000 x 2000 px</option>
                 <option value="2">6000 x 4000 px</option>
-                <option value="original">Original (Full Size)</option>
+                <option value="original">Background Original Size</option>
             </select>
             <div class="save-btn-row">
-                <button id="btn-save-pc">💻 PC Save</button><button id="btn-save-mobile">📱 Mobile Save</button>
+                <button id="btn-save-pc" class="primary-green">💻 PC Save</button>
+                <button id="btn-save-mobile" class="primary-blue">📱 Mobile Save</button>
             </div>
         </div>
     </div>
@@ -185,28 +540,87 @@
     <div id="ui-right" class="panel">
         <h3>Scene Manager</h3>
         <div class="tab-bar">
-            <button class="tab-btn active" id="s-tab-front" onclick="switchScene('front')">Front View</button>
-            <button class="tab-btn" id="s-tab-frontSweet" onclick="switchScene('frontSweetSpot')">Front SweetSpot</button>
-            <button class="tab-btn" id="s-tab-back" onclick="switchScene('back')">Back View</button>
-            <button class="tab-btn" id="s-tab-backNight" onclick="switchScene('backNight')">Back Night</button>
+            <button class="tab-btn active" id="s-tab-front" onclick="switchScene('front')">Front</button>
+            <button class="tab-btn" id="s-tab-frontSweet" onclick="switchScene('frontSweetSpot')">Sweet</button>
+            <button class="tab-btn" id="s-tab-back" onclick="switchScene('back')">Back</button>
+            <button class="tab-btn" id="s-tab-backNight" onclick="switchScene('backNight')">Night</button>
         </div>
 
         <label class="vis-label" style="margin-bottom: 15px;">
-            <input type="checkbox" id="bg-visible-chk" checked onchange="toggleBgVis()"> 👁️ Background (Active Scene)
+            <input type="checkbox" id="bg-visible-chk" checked onchange="toggleBgVis()"> 👁️ Background Plane
         </label>
 
         <div class="control-group">
-            <div class="control-label">Load Background (View)</div>
+            <div class="control-label">Load Background</div>
             <input type="file" id="input-bg" accept="image/*">
+            <div class="hint">배경은 Three.js 카메라에 붙은 image plane으로 렌더링됩니다.</div>
         </div>
 
         <div class="divider"></div>
-        <div style="font-size: 10px; color:#666; text-align: center;">2026 / LEE JUNGHO / ChannelA B&C / V6.0 GitHub Edition</div>
+
+        <h3>WebM Export</h3>
+        <div class="control-group">
+            <div class="control-label">Export FPS</div>
+            <select id="export-fps">
+                <option value="auto">Auto from video</option>
+                <option value="24">24</option>
+                <option value="29.97">29.97</option>
+                <option value="30">30</option>
+                <option value="59.94">59.94</option>
+                <option value="60">60</option>
+            </select>
+            <div id="fps-status" class="hint">Auto는 requestVideoFrameCallback 기반 추정값을 사용합니다.</div>
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">Export Resolution</div>
+            <select id="export-size">
+                <option value="1280x853">1280 x 853</option>
+                <option value="1920x1280" selected>1920 x 1280</option>
+                <option value="3000x2000">3000 x 2000</option>
+                <option value="stage">Current Preview Size</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">Bitrate Mbps</div>
+            <input type="number" id="export-bitrate" min="2" max="80" step="1" value="16">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">Static Duration sec</div>
+            <input type="number" id="export-static-duration" min="1" max="60" step="1" value="5">
+            <div class="hint">동영상 텍스처가 없을 때만 사용됩니다.</div>
+        </div>
+
+        <div class="audio-option">
+            <label class="vis-label" style="margin:0;">
+                <input type="checkbox" id="export-audio-enabled"> 🔊 Include audio if available
+            </label>
+            <div class="hint">ON이면 로드된 동영상 텍스처의 오디오를 WebM에 함께 기록합니다. 여러 동영상이 있으면 믹스됩니다.</div>
+        </div>
+
+        <button id="btn-export-webm" class="primary-purple" style="width:100%;">🎬 Export WebM</button>
+        <div id="export-status" class="status-box">Ready.</div>
+
+        <div class="divider"></div>
+        <div style="font-size: 10px; color:#666; text-align: center; line-height:1.45;">
+            2026 / LEE JUNGHO / LunarGraphics / ChannelA BNC<br>
+            V7.0 Video Export Edition
+        </div>
     </div>
 
     <video id="video-source" autoplay muted loop playsinline style="display:none;"></video>
 
-    <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/", "jszip": "https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm" } } </script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+            "jszip": "https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm"
+        }
+    }
+    </script>
 
     <script type="module">
         import * as THREE from 'three';
@@ -214,10 +628,11 @@
         import JSZip from 'jszip';
 
         const TARGET_ASPECT = 1.5;
-        const stage = document.getElementById('stage'), container = document.getElementById('canvas-container');
+        const BG_DISTANCE = 100;
+        const stage = document.getElementById('stage');
+        const container = document.getElementById('canvas-container');
 
-        // [Asset Config] GitHub 에셋 경로 설정
-        const ASSET_PATH = './assets/'; 
+        const ASSET_PATH = './assets/';
         const MODEL_FILENAME = 'Merged_Full_Format_v2.glb';
         const BG_FILES = {
             front: 'bg_front.jpg',
@@ -226,157 +641,320 @@
             backNight: 'bg_night.jpg'
         };
 
-        function resizeStage() {
-            const winW = window.innerWidth, winH = window.innerHeight;
-            let w, h;
-            if (winW / winH > TARGET_ASPECT) { h = winH; w = winH * TARGET_ASPECT; } else { w = winW; h = winW / TARGET_ASPECT; }
-            stage.style.width = `${w}px`; stage.style.height = `${h}px`;
-            if (renderer && camera) { renderer.setSize(w, h); camera.aspect = TARGET_ASPECT; camera.updateProjectionMatrix(); }
-        }
-        window.addEventListener('resize', resizeStage);
-
         const scene = new THREE.Scene();
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-        renderer.setPixelRatio(window.devicePixelRatio); 
-        renderer.outputColorSpace = THREE.SRGBColorSpace; 
+        const renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            alpha: true,
+            preserveDrawingBuffer: true
+        });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.autoClear = true;
         container.appendChild(renderer.domElement);
 
         const camera = new THREE.PerspectiveCamera(43.8, TARGET_ASPECT, 0.1, 10000);
-        resizeStage();
+        scene.add(camera);
 
         scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); dirLight.position.set(5, 10, 7); scene.add(dirLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        dirLight.position.set(5, 10, 7);
+        scene.add(dirLight);
 
-        const slots = [
-            { root: null, targetMesh: null, texture: null, config: { prefix: 'LUUX', visible: true, emissive: 1.0, tint: '#ffffff', flipX: false, flipY: false, rot: 0, wrap: false, offsetU: 0.00, offsetV: 0, tilingU: 1.0, tilingV: 1.0, camOverride: false } },
-            { root: null, targetMesh: null, texture: null, config: { prefix: 'ILMIN', visible: true, emissive: 1.0, tint: '#ffffff', flipX: false, flipY: false, rot: 0, wrap: false, offsetU: 0.00, offsetV: 0, tilingU: 1.0, tilingV: 1.0, camOverride: false } }
-        ];
+        const textureLoader = new THREE.TextureLoader();
+        const gltfLoader = new GLTFLoader();
 
         const sceneData = {
-            front: { suffix: 'Front', bgImg: null, bgVisible: true, fov: 52.4, pos: [-8.587, 1.4, 12.330], rot: [16.5, -39.5, 10.3] },
-            frontSweetSpot: { suffix: 'F_Sweet', bgImg: null, bgVisible: true, fov: 49.2, pos: [-7.243, -0.031, 12.760], rot: [22.3, -34.5, 13.1] },
-            back: { suffix: 'Back', bgImg: null, bgVisible: true, fov: 46.4, pos: [-9.869, 0.04, -9.425], rot: [-30.1, -130.95, -24.6] },
-            backNight: { suffix: 'B_Night', bgImg: null, bgVisible: true, fov: 47.9, pos: [-9.869, 0.04, -9.425], rot: [-29.3, -132.3, -21.9] }
+            front: {
+                suffix: 'Front',
+                bgTexture: null,
+                bgImageSize: null,
+                bgVisible: true,
+                fov: 52.4,
+                pos: [-8.587, 1.4, 12.330],
+                rot: [16.5, -39.5, 10.3]
+            },
+            frontSweetSpot: {
+                suffix: 'F_Sweet',
+                bgTexture: null,
+                bgImageSize: null,
+                bgVisible: true,
+                fov: 49.2,
+                pos: [-7.243, -0.031, 12.760],
+                rot: [22.3, -34.5, 13.1]
+            },
+            back: {
+                suffix: 'Back',
+                bgTexture: null,
+                bgImageSize: null,
+                bgVisible: true,
+                fov: 46.4,
+                pos: [-9.869, 0.04, -9.425],
+                rot: [-30.1, -130.95, -24.6]
+            },
+            backNight: {
+                suffix: 'B_Night',
+                bgTexture: null,
+                bgImageSize: null,
+                bgVisible: true,
+                fov: 47.9,
+                pos: [-9.869, 0.04, -9.425],
+                rot: [-29.3, -132.3, -21.9]
+            }
         };
 
-        let activeModelIdx = 0, activeSceneType = 'front';
+        const slots = [
+            {
+                root: null,
+                targetMesh: null,
+                texture: null,
+                videoElement: null,
+                videoTexture: null,
+                mediaUrl: null,
+                mediaName: '',
+                mediaType: 'none',
+                sourceFps: null,
+                config: {
+                    prefix: 'LUUX',
+                    visible: true,
+                    emissive: 1.0,
+                    tint: '#ffffff',
+                    flipX: false,
+                    flipY: false,
+                    rot: 0,
+                    wrap: false,
+                    offsetU: 0.00,
+                    offsetV: 0,
+                    tilingU: 1.0,
+                    tilingV: 1.0,
+                    camOverride: false
+                }
+            },
+            {
+                root: null,
+                targetMesh: null,
+                texture: null,
+                videoElement: null,
+                videoTexture: null,
+                mediaUrl: null,
+                mediaName: '',
+                mediaType: 'none',
+                sourceFps: null,
+                config: {
+                    prefix: 'ILMIN',
+                    visible: true,
+                    emissive: 1.0,
+                    tint: '#ffffff',
+                    flipX: false,
+                    flipY: false,
+                    rot: 0,
+                    wrap: false,
+                    offsetU: 0.00,
+                    offsetV: 0,
+                    tilingU: 1.0,
+                    tilingV: 1.0,
+                    camOverride: false
+                }
+            }
+        ];
+
+        let activeModelIdx = 0;
+        let activeSceneType = 'front';
+        let bgMesh = null;
         let sharedVideoTexture = null;
-        const videoElement = document.getElementById('video-source');
+        let isExporting = false;
+        let exportAudioContext = null;
+        let exportAudioDestination = null;
+        const audioSourceMap = new WeakMap();
+        const webcamVideoElement = document.getElementById('video-source');
+
+        function showToast(message) {
+            const t = document.getElementById('toast');
+            t.innerText = message;
+            t.style.opacity = 1;
+            clearTimeout(showToast._timer);
+            showToast._timer = setTimeout(() => t.style.opacity = 0, 3000);
+        }
+
+        function setExportStatus(message) {
+            document.getElementById('export-status').innerHTML = message;
+        }
+
+        function resizeStage() {
+            if (isExporting) return;
+
+            const winW = window.innerWidth;
+            const winH = window.innerHeight;
+            let w, h;
+
+            if (winW / winH > TARGET_ASPECT) {
+                h = winH;
+                w = winH * TARGET_ASPECT;
+            } else {
+                w = winW;
+                h = winW / TARGET_ASPECT;
+            }
+
+            stage.style.width = `${w}px`;
+            stage.style.height = `${h}px`;
+
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(w, h);
+            camera.aspect = TARGET_ASPECT;
+            camera.updateProjectionMatrix();
+            updateCameraBackgroundPlane();
+        }
+        window.addEventListener('resize', resizeStage);
+
+        function ensureBackgroundPlane() {
+            if (bgMesh) return;
+
+            const geometry = new THREE.PlaneGeometry(1, 1);
+            const material = new THREE.MeshBasicMaterial({
+                map: null,
+                depthWrite: false,
+                depthTest: false,
+                toneMapped: false
+            });
+
+            bgMesh = new THREE.Mesh(geometry, material);
+            bgMesh.position.set(0, 0, -BG_DISTANCE);
+            bgMesh.renderOrder = -9999;
+            bgMesh.frustumCulled = false;
+            camera.add(bgMesh);
+        }
+
+        function updateCameraBackgroundPlane() {
+            ensureBackgroundPlane();
+
+            const data = sceneData[activeSceneType];
+            const distance = Math.abs(bgMesh.position.z);
+            const vFov = THREE.MathUtils.degToRad(camera.fov);
+            const height = 2 * Math.tan(vFov / 2) * distance;
+            const width = height * camera.aspect;
+
+            bgMesh.geometry.dispose();
+            bgMesh.geometry = new THREE.PlaneGeometry(width, height);
+            bgMesh.material.map = data.bgTexture || null;
+            bgMesh.material.needsUpdate = true;
+            bgMesh.visible = !!(data.bgVisible && data.bgTexture);
+        }
 
         function applyMeshVisibility(idx) {
-            const s = slots[idx]; if (!s.root) return;
+            const s = slots[idx];
+            if (!s.root) return;
+
             const prefix = s.config.prefix;
             const suffix = sceneData[activeSceneType].suffix;
             s.targetMesh = null;
+
             s.root.traverse(child => {
-                if (child.isMesh) {
-                    const isMatch = child.name.includes(prefix) && child.name.includes(suffix);
-                    child.visible = isMatch;
-                    if (isMatch) { s.targetMesh = child; if (child.material) child.material = child.material.clone(); }
+                if (!child.isMesh) return;
+
+                const isMatch = child.name.includes(prefix) && child.name.includes(suffix);
+                child.visible = isMatch;
+
+                if (isMatch) {
+                    s.targetMesh = child;
+                    if (child.material) child.material = child.material.clone();
                 }
             });
+
+            if (s.root) s.root.visible = s.config.visible;
             if (s.targetMesh) updateMat(idx);
         }
 
         window.switchScene = (type) => {
             activeSceneType = type;
             const data = sceneData[type];
+
             document.getElementById('s-tab-front').classList.toggle('active', type === 'front');
             document.getElementById('s-tab-frontSweet').classList.toggle('active', type === 'frontSweetSpot');
             document.getElementById('s-tab-back').classList.toggle('active', type === 'back');
             document.getElementById('s-tab-backNight').classList.toggle('active', type === 'backNight');
-            camera.position.set(...data.pos); camera.rotation.set(data.rot[0]*Math.PI/180, data.rot[1]*Math.PI/180, data.rot[2]*Math.PI/180);
-            camera.fov = data.fov; camera.updateProjectionMatrix();
+
+            camera.position.set(...data.pos);
+            camera.rotation.set(
+                data.rot[0] * Math.PI / 180,
+                data.rot[1] * Math.PI / 180,
+                data.rot[2] * Math.PI / 180
+            );
+            camera.fov = data.fov;
+            camera.updateProjectionMatrix();
+
             document.getElementById('bg-visible-chk').checked = data.bgVisible;
-            updateBgDisplay(); applyMeshVisibility(0); applyMeshVisibility(1);
-            showToast(`Scene: ${type.toUpperCase()}`);
+            updateCameraBackgroundPlane();
+            applyMeshVisibility(0);
+            applyMeshVisibility(1);
+            showToast(`Scene: ${type}`);
         };
 
-        // --- GitHub Auto Load Logic ---
-        const textureLoader = new THREE.TextureLoader();
-        const gltfLoader = new GLTFLoader();
-
         async function loadGitHubAssets() {
-            showToast("서버에서 에셋 로딩 중...");
-            
-            // 1. Load GLB
-            const modelUrl = ASSET_PATH + MODEL_FILENAME;
-            gltfLoader.load(modelUrl, (gltf) => {
-                slots.forEach(s => { if(s.root) scene.remove(s.root); });
-                slots[0].root = gltf.scene; scene.add(slots[0].root);
-                slots[1].root = gltf.scene.clone(); scene.add(slots[1].root);
-                applyMeshVisibility(0); applyMeshVisibility(1);
-                showToast("3D 모델 로딩 완료");
+            showToast('서버에서 에셋 로딩 중...');
+
+            gltfLoader.load(ASSET_PATH + MODEL_FILENAME, (gltf) => {
+                slots.forEach(s => {
+                    if (s.root) scene.remove(s.root);
+                });
+
+                slots[0].root = gltf.scene;
+                slots[1].root = gltf.scene.clone();
+                scene.add(slots[0].root);
+                scene.add(slots[1].root);
+                applyMeshVisibility(0);
+                applyMeshVisibility(1);
+                showToast('3D 모델 로딩 완료');
             }, undefined, (err) => {
                 console.error(err);
-                showToast("모델을 찾을 수 없습니다: assets 폴더를 확인하세요.");
+                showToast('모델을 찾을 수 없습니다. assets 폴더를 확인하세요.');
             });
 
-            // 2. Load Backgrounds
             for (const [key, fileName] of Object.entries(BG_FILES)) {
+                loadBackgroundFromUrl(key, ASSET_PATH + fileName, false);
+            }
+        }
+
+        function loadBackgroundFromUrl(sceneKey, url, notify = true) {
+            textureLoader.load(url, (tex) => {
+                tex.colorSpace = THREE.SRGBColorSpace;
+                tex.minFilter = THREE.LinearFilter;
+                tex.magFilter = THREE.LinearFilter;
+                sceneData[sceneKey].bgTexture = tex;
+
                 const img = new Image();
-                img.crossOrigin = "anonymous";
-                img.src = ASSET_PATH + fileName;
                 img.onload = () => {
-                    sceneData[key].bgImg = img;
-                    if (activeSceneType === key) updateBgDisplay();
+                    sceneData[sceneKey].bgImageSize = {
+                        width: img.naturalWidth,
+                        height: img.naturalHeight
+                    };
                 };
-            }
-        }
+                img.src = url;
 
-        // --- Drag & Drop Logic (Fallback) ---
-        const dropOverlay = document.getElementById('drop-overlay');
-        window.addEventListener('dragover', (e) => { e.preventDefault(); dropOverlay.classList.add('active'); });
-        window.addEventListener('dragleave', (e) => { e.preventDefault(); if (e.relatedTarget === null) dropOverlay.classList.remove('active'); });
-        window.addEventListener('drop', async (e) => {
-            e.preventDefault(); dropOverlay.classList.remove('active');
-            await handleBatchFiles(Array.from(e.dataTransfer.files));
-        });
-
-        // Texture Drop-Zones
-        [0, 1].forEach(idx => {
-            const el = document.getElementById(`tex-drop-${idx}`);
-            el.addEventListener('dragover', (e) => { e.stopPropagation(); e.preventDefault(); el.classList.add('active-drop'); });
-            el.addEventListener('dragleave', (e) => { e.stopPropagation(); e.preventDefault(); el.classList.remove('active-drop'); });
-            el.addEventListener('drop', async (e) => {
-                e.stopPropagation(); e.preventDefault();
-                el.classList.remove('active-drop');
-                dropOverlay.classList.remove('active'); 
-                const file = e.dataTransfer.files[0];
-                if (file && file.type.startsWith('image/')) {
-                    loadTextureToSlot(idx, file);
-                    el.classList.add('has-file');
-                }
+                if (activeSceneType === sceneKey) updateCameraBackgroundPlane();
+                if (notify) showToast(`Background loaded: ${sceneKey}`);
+            }, undefined, (err) => {
+                console.warn(`Background not loaded: ${sceneKey}`, err);
             });
-        });
-
-        async function handleBatchFiles(files) {
-            for (const file of files) {
-                const name = file.name.toLowerCase();
-                if (name.startsWith('._') || name.startsWith('.') || name.includes('__macosx')) continue;
-                if (name.endsWith('.zip')) { await handleZipFile(file); }
-                else if (name.endsWith('.glb') || name.endsWith('.gltf')) { handleMasterGLB(file); }
-                else if (name.match(/\.(jpg|jpeg|png|webp)$/)) { classifyAndLoadImage(file); }
-            }
         }
 
-        async function handleZipFile(file) {
-            showToast("Unzipping assets...");
-            const zip = await JSZip.loadAsync(file);
-            const zipFiles = [];
-            for (const [path, zipEntry] of Object.entries(zip.files)) {
-                if (zipEntry.dir) continue;
-                if (path.includes('__MACOSX') || path.split('/').pop().startsWith('._')) continue;
-                const blob = await zipEntry.async("blob");
-                zipFiles.push(new File([blob], path.split('/').pop(), { type: getMimeType(path) }));
-            }
-            await handleBatchFiles(zipFiles);
-            showToast("Batch loading complete");
-        }
+        async function loadBgToScene(sceneKey, file) {
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => {
+                sceneData[sceneKey].bgImageSize = {
+                    width: img.naturalWidth,
+                    height: img.naturalHeight
+                };
+            };
+            img.src = url;
 
-        function getMimeType(path) {
-            const ext = path.split('.').pop().toLowerCase();
-            return { 'glb': 'model/gltf-binary', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png', 'webp': 'image/webp' }[ext] || '';
+            textureLoader.load(url, (tex) => {
+                tex.colorSpace = THREE.SRGBColorSpace;
+                tex.minFilter = THREE.LinearFilter;
+                tex.magFilter = THREE.LinearFilter;
+                sceneData[sceneKey].bgTexture = tex;
+                updateCameraBackgroundPlane();
+                showToast(`Background loaded: ${sceneKey}`);
+            });
         }
 
         function classifyAndLoadImage(file) {
@@ -385,165 +963,922 @@
             else if (name.includes('b_night')) loadBgToScene('backNight', file);
             else if (name.includes('front')) loadBgToScene('front', file);
             else if (name.includes('back')) loadBgToScene('back', file);
+            else loadMediaToSlot(activeModelIdx, file);
         }
 
-        async function loadBgToScene(sceneKey, file) {
-            const img = new Image();
-            img.src = URL.createObjectURL(file);
-            img.onload = () => { sceneData[sceneKey].bgImg = img; updateBgDisplay(); };
+        function clearSlotMediaInternal(idx) {
+            const s = slots[idx];
+
+            if (s.videoElement) {
+                s.videoElement.pause();
+                s.videoElement.removeAttribute('src');
+                s.videoElement.load();
+            }
+            if (s.videoTexture) s.videoTexture.dispose();
+            if (s.texture) s.texture.dispose();
+            if (s.mediaUrl) URL.revokeObjectURL(s.mediaUrl);
+
+            s.texture = null;
+            s.videoElement = null;
+            s.videoTexture = null;
+            s.mediaUrl = null;
+            s.mediaName = '';
+            s.mediaType = 'none';
+            s.sourceFps = null;
         }
+
+        window.clearSlotMedia = (idx) => {
+            clearSlotMediaInternal(idx);
+            updateMat(idx);
+            updateMediaStatus(idx);
+            document.getElementById(`tex-drop-${idx}`).classList.remove('has-file');
+            showToast(`${slots[idx].config.prefix} media cleared`);
+        };
+
+        function updateMediaStatus(idx) {
+            const s = slots[idx];
+            const el = document.getElementById(`media-status-${idx}`);
+            const playBtn = document.getElementById(`btn-media-play-${idx}`);
+            const seek = document.getElementById(`media-seek-${idx}`);
+
+            if (s.mediaType === 'image') {
+                el.innerHTML = `<strong>Image</strong><br>${s.mediaName}`;
+                playBtn.disabled = true;
+                seek.disabled = true;
+            } else if (s.mediaType === 'video') {
+                const v = s.videoElement;
+                const dur = Number.isFinite(v?.duration) ? `${v.duration.toFixed(2)} sec` : 'Unknown duration';
+                const fps = s.sourceFps ? `${s.sourceFps} fps` : 'FPS pending / Auto';
+                el.innerHTML = `<strong>Video</strong><br>${s.mediaName}<br>${v?.videoWidth || '?'} x ${v?.videoHeight || '?'} / ${dur}<br>${fps}`;
+                playBtn.disabled = false;
+                seek.disabled = false;
+            } else {
+                el.innerHTML = 'No media loaded.';
+                playBtn.disabled = true;
+                seek.disabled = true;
+            }
+
+            updateTransportUI(idx);
+        }
+
+        function formatTime(seconds) {
+            if (!Number.isFinite(seconds) || seconds < 0) return '00:00';
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            const ms = Math.floor((seconds % 1) * 100);
+            return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
+        }
+
+        function updateTransportUI(idx) {
+            const slot = slots[idx];
+            const video = slot.videoElement;
+            const playBtn = document.getElementById(`btn-media-play-${idx}`);
+            const seek = document.getElementById(`media-seek-${idx}`);
+            const time = document.getElementById(`media-time-${idx}`);
+
+            if (!video || slot.mediaType !== 'video') {
+                playBtn.innerText = '▶ Play';
+                seek.value = 0;
+                time.innerText = '00:00 / 00:00';
+                return;
+            }
+
+            playBtn.innerText = video.paused ? '▶ Play' : '⏸ Pause';
+
+            if (Number.isFinite(video.duration) && video.duration > 0) {
+                seek.value = Math.round((video.currentTime / video.duration) * 1000);
+                time.innerText = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+            } else {
+                seek.value = 0;
+                time.innerText = '00:00 / 00:00';
+            }
+        }
+
+        function updateAllTransportUI() {
+            updateTransportUI(0);
+            updateTransportUI(1);
+        }
+
+        window.toggleSlotPlayback = async (idx) => {
+            const video = slots[idx].videoElement;
+            if (!video) return;
+
+            try {
+                if (video.paused) await video.play();
+                else video.pause();
+                updateTransportUI(idx);
+            } catch (err) {
+                console.warn(err);
+                showToast('브라우저가 재생을 차단했습니다. 비디오를 다시 선택하거나 화면을 클릭한 뒤 시도하세요.');
+            }
+        };
+
+        window.seekSlotPreview = (idx, value) => {
+            const video = slots[idx].videoElement;
+            if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return;
+            video.currentTime = (parseFloat(value) / 1000) * video.duration;
+            updateTransportUI(idx);
+        };
 
         function loadTextureToSlot(idx, file) {
-            textureLoader.load(URL.createObjectURL(file), (tex) => {
+            clearSlotMediaInternal(idx);
+            const url = URL.createObjectURL(file);
+            const s = slots[idx];
+            s.mediaUrl = url;
+            s.mediaName = file.name;
+            s.mediaType = 'image';
+
+            textureLoader.load(url, (tex) => {
                 tex.colorSpace = THREE.SRGBColorSpace;
-                slots[idx].texture = tex;
+                tex.flipY = false;
+                tex.minFilter = THREE.LinearFilter;
+                tex.magFilter = THREE.LinearFilter;
+                s.texture = tex;
                 updateMat(idx);
-                showToast(`${slots[idx].config.prefix} Texture Updated`);
+                updateMediaStatus(idx);
+                document.getElementById(`tex-drop-${idx}`).classList.add('has-file');
+                showToast(`${s.config.prefix} image texture updated`);
             });
+        }
+
+        function loadVideoToSlot(idx, file) {
+            clearSlotMediaInternal(idx);
+            const url = URL.createObjectURL(file);
+            const s = slots[idx];
+
+            const video = document.createElement('video');
+            video.src = url;
+            video.muted = true;
+            video.loop = true;
+            video.playsInline = true;
+            video.preload = 'auto';
+            video.crossOrigin = 'anonymous';
+
+            s.mediaUrl = url;
+            s.mediaName = file.name;
+            s.mediaType = 'video';
+            s.videoElement = video;
+
+            video.addEventListener('loadedmetadata', () => {
+                const tex = new THREE.VideoTexture(video);
+                tex.colorSpace = THREE.SRGBColorSpace;
+                tex.minFilter = THREE.LinearFilter;
+                tex.magFilter = THREE.LinearFilter;
+                tex.flipY = false;
+                s.videoTexture = tex;
+                updateMat(idx);
+                updateMediaStatus(idx);
+            }, { once: true });
+
+            video.addEventListener('canplay', async () => {
+                try {
+                    await video.play();
+                    estimateVideoFPS(video, 60, 2500).then(fps => {
+                        if (fps) {
+                            s.sourceFps = fps;
+                            updateMediaStatus(idx);
+                            document.getElementById('fps-status').innerText = `Detected: ${fps} fps`;
+                        }
+                    });
+                } catch (err) {
+                    console.warn('Video autoplay blocked or delayed:', err);
+                }
+            }, { once: true });
+
+            video.addEventListener('error', () => {
+                showToast('동영상 로딩 실패. 브라우저가 지원하는 H.264/MP4/WebM인지 확인하세요.');
+            });
+
+            document.getElementById(`tex-drop-${idx}`).classList.add('has-file');
+            updateMediaStatus(idx);
+            video.load();
+            showToast(`${s.config.prefix} video texture loaded`);
+        }
+
+        function loadMediaToSlot(idx, file) {
+            if (!file) return;
+
+            if (file.type.startsWith('image/')) {
+                loadTextureToSlot(idx, file);
+            } else if (file.type.startsWith('video/')) {
+                loadVideoToSlot(idx, file);
+            } else {
+                const name = file.name.toLowerCase();
+                if (name.match(/\.(mp4|mov|webm|m4v)$/)) loadVideoToSlot(idx, file);
+                else if (name.match(/\.(jpg|jpeg|png|webp)$/)) loadTextureToSlot(idx, file);
+                else showToast('지원하지 않는 미디어 형식입니다.');
+            }
         }
 
         function handleMasterGLB(file) {
             const url = URL.createObjectURL(file);
             gltfLoader.load(url, (gltf) => {
-                slots.forEach(s => { if(s.root) scene.remove(s.root); });
-                slots[0].root = gltf.scene; scene.add(slots[0].root);
-                slots[1].root = gltf.scene.clone(); scene.add(slots[1].root);
-                applyMeshVisibility(0); applyMeshVisibility(1);
-                showToast("Master GLB Distributed");
+                slots.forEach(s => {
+                    if (s.root) scene.remove(s.root);
+                });
+
+                slots[0].root = gltf.scene;
+                slots[1].root = gltf.scene.clone();
+                scene.add(slots[0].root);
+                scene.add(slots[1].root);
+                applyMeshVisibility(0);
+                applyMeshVisibility(1);
+                showToast('Master GLB distributed');
             });
         }
-        document.getElementById('input-model-master').onchange = (e) => handleBatchFiles(Array.from(e.target.files));
 
-        // --- Standard Logic ---
+        async function handleZipFile(file) {
+            showToast('Unzipping assets...');
+            const zip = await JSZip.loadAsync(file);
+            const zipFiles = [];
+
+            for (const [path, zipEntry] of Object.entries(zip.files)) {
+                if (zipEntry.dir) continue;
+                if (path.includes('__MACOSX') || path.split('/').pop().startsWith('._')) continue;
+
+                const blob = await zipEntry.async('blob');
+                zipFiles.push(new File([blob], path.split('/').pop(), { type: getMimeType(path) }));
+            }
+
+            await handleBatchFiles(zipFiles);
+            showToast('Batch loading complete');
+        }
+
+        function getMimeType(path) {
+            const ext = path.split('.').pop().toLowerCase();
+            return {
+                glb: 'model/gltf-binary',
+                gltf: 'model/gltf+json',
+                jpg: 'image/jpeg',
+                jpeg: 'image/jpeg',
+                png: 'image/png',
+                webp: 'image/webp',
+                mp4: 'video/mp4',
+                mov: 'video/quicktime',
+                webm: 'video/webm',
+                m4v: 'video/x-m4v'
+            }[ext] || '';
+        }
+
+        async function handleBatchFiles(files) {
+            for (const file of files) {
+                const name = file.name.toLowerCase();
+                if (name.startsWith('._') || name.startsWith('.') || name.includes('__macosx')) continue;
+
+                if (name.endsWith('.zip')) await handleZipFile(file);
+                else if (name.endsWith('.glb') || name.endsWith('.gltf')) handleMasterGLB(file);
+                else if (file.type.startsWith('video/') || name.match(/\.(mp4|mov|webm|m4v)$/)) loadMediaToSlot(activeModelIdx, file);
+                else if (name.match(/\.(jpg|jpeg|png|webp)$/)) classifyAndLoadImage(file);
+            }
+        }
+
+        const dropOverlay = document.getElementById('drop-overlay');
+        window.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropOverlay.classList.add('active');
+        });
+        window.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            if (e.relatedTarget === null) dropOverlay.classList.remove('active');
+        });
+        window.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            dropOverlay.classList.remove('active');
+            await handleBatchFiles(Array.from(e.dataTransfer.files));
+        });
+
+        [0, 1].forEach(idx => {
+            const el = document.getElementById(`tex-drop-${idx}`);
+            el.addEventListener('dragover', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                el.classList.add('active-drop');
+            });
+            el.addEventListener('dragleave', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                el.classList.remove('active-drop');
+            });
+            el.addEventListener('drop', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                el.classList.remove('active-drop');
+                dropOverlay.classList.remove('active');
+                const file = e.dataTransfer.files[0];
+                loadMediaToSlot(idx, file);
+            });
+        });
+
+        function updateMat(idx) {
+            const s = slots[idx];
+            if (!s.targetMesh) return;
+
+            const m = s.targetMesh.material;
+            let tex = null;
+
+            if (s.config.camOverride) tex = sharedVideoTexture;
+            else if (s.videoTexture) tex = s.videoTexture;
+            else if (s.texture) tex = s.texture;
+
+            if (tex) {
+                tex.flipY = false;
+                tex.rotation = (s.config.rot * 90) * (Math.PI / 180);
+                tex.offset.set(s.config.offsetU, s.config.offsetV);
+                tex.repeat.set(
+                    s.config.tilingU * (s.config.flipX ? -1 : 1),
+                    s.config.tilingV * (s.config.flipY ? -1 : 1)
+                );
+                tex.wrapS = tex.wrapT = s.config.wrap ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
+                tex.needsUpdate = true;
+                m.map = tex;
+                m.emissiveMap = tex;
+            } else {
+                m.map = null;
+                m.emissiveMap = null;
+            }
+
+            m.emissive = new THREE.Color(s.config.tint);
+            m.emissiveIntensity = s.config.emissive;
+            m.transparent = true;
+            m.needsUpdate = true;
+        }
+
         window.toggleCamOverride = async (idx) => {
-            const slot = slots[idx]; slot.config.camOverride = !slot.config.camOverride;
+            const slot = slots[idx];
+            slot.config.camOverride = !slot.config.camOverride;
+            document.getElementById(`btn-cam-${idx}`).classList.toggle('active-btn', slot.config.camOverride);
+
             if (slot.config.camOverride) {
                 try {
                     await navigator.mediaDevices.getUserMedia({ video: true });
                     const devices = await navigator.mediaDevices.enumerateDevices();
-                    document.getElementById('cam-device-select').innerHTML = devices.filter(d => d.kind === 'videoinput').map(d => `<option value="${d.deviceId}">${d.label || 'Camera '+d.deviceId}</option>`).join('');
+                    document.getElementById('cam-device-select').innerHTML = devices
+                        .filter(d => d.kind === 'videoinput')
+                        .map(d => `<option value="${d.deviceId}">${d.label || 'Camera ' + d.deviceId}</option>`)
+                        .join('');
+
                     document.getElementById('cam-selector-ui').style.display = 'block';
-                    if (!sharedVideoTexture) { sharedVideoTexture = new THREE.VideoTexture(videoElement); sharedVideoTexture.colorSpace = THREE.SRGBColorSpace; sharedVideoTexture.minFilter = THREE.LinearFilter; }
-                    videoElement.addEventListener('loadeddata', () => { updateMat(0); updateMat(1); }, { once: true });
-                    await changeCamSource(); 
-                } catch (err) { showToast("Camera access denied."); slot.config.camOverride = false; }
-            } else { if (!slots[0].config.camOverride && !slots[1].config.camOverride) { if (videoElement.srcObject) { videoElement.srcObject.getTracks().forEach(t => t.stop()); videoElement.srcObject = null; } document.getElementById('cam-selector-ui').style.display = 'none'; } updateMat(idx); }
+
+                    if (!sharedVideoTexture) {
+                        sharedVideoTexture = new THREE.VideoTexture(webcamVideoElement);
+                        sharedVideoTexture.colorSpace = THREE.SRGBColorSpace;
+                        sharedVideoTexture.minFilter = THREE.LinearFilter;
+                        sharedVideoTexture.magFilter = THREE.LinearFilter;
+                    }
+
+                    webcamVideoElement.addEventListener('loadeddata', () => {
+                        updateMat(0);
+                        updateMat(1);
+                    }, { once: true });
+
+                    await changeCamSource();
+                } catch (err) {
+                    console.error(err);
+                    showToast('Camera access denied.');
+                    slot.config.camOverride = false;
+                    document.getElementById(`btn-cam-${idx}`).classList.remove('active-btn');
+                }
+            } else {
+                if (!slots[0].config.camOverride && !slots[1].config.camOverride) {
+                    if (webcamVideoElement.srcObject) {
+                        webcamVideoElement.srcObject.getTracks().forEach(t => t.stop());
+                        webcamVideoElement.srcObject = null;
+                    }
+                    document.getElementById('cam-selector-ui').style.display = 'none';
+                }
+                updateMat(idx);
+            }
         };
 
         window.changeCamSource = async () => {
             const deviceId = document.getElementById('cam-device-select').value;
-            if (videoElement.srcObject) { videoElement.srcObject.getTracks().forEach(t => t.stop()); }
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: deviceId } } });
-            videoElement.srcObject = stream; await videoElement.play(); updateMat(0); updateMat(1);
-        };
-        window.closeCamSelector = () => document.getElementById('cam-selector-ui').style.display = 'none';
+            if (webcamVideoElement.srcObject) {
+                webcamVideoElement.srcObject.getTracks().forEach(t => t.stop());
+            }
 
-        function updateMat(i) {
-            const s = slots[i]; if(!s.targetMesh) return;
-            const m = s.targetMesh.material;
-            let tex = s.config.camOverride ? sharedVideoTexture : s.texture;
-            if(tex) {
-                tex.flipY = false; tex.rotation = (s.config.rot * 90) * (Math.PI / 180); 
-                tex.offset.set(s.config.offsetU, s.config.offsetV);
-                tex.repeat.set(s.config.tilingU * (s.config.flipX ? -1 : 1), s.config.tilingV * (s.config.flipY ? -1 : 1));
-                tex.wrapS = tex.wrapT = s.config.wrap ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
-                m.map = tex; m.emissiveMap = tex; tex.needsUpdate = true;
-            } else { m.map = null; m.emissiveMap = null; }
-            m.emissive = new THREE.Color(s.config.tint); m.emissiveIntensity = s.config.emissive;
-            m.transparent = true; m.needsUpdate = true;
-        }
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: deviceId ? { deviceId: { exact: deviceId } } : true
+            });
+            webcamVideoElement.srcObject = stream;
+            await webcamVideoElement.play();
+            updateMat(0);
+            updateMat(1);
+        };
+
+        window.closeCamSelector = () => {
+            document.getElementById('cam-selector-ui').style.display = 'none';
+        };
 
         window.switchModelTab = (idx) => {
             activeModelIdx = idx;
-            document.getElementById('m-tab-0').classList.toggle('active', idx === 0); document.getElementById('m-tab-1').classList.toggle('active', idx === 1);
-            document.getElementById('files-slot-0').classList.toggle('active', idx === 0); document.getElementById('files-slot-1').classList.toggle('active', idx === 1);
+            document.getElementById('m-tab-0').classList.toggle('active', idx === 0);
+            document.getElementById('m-tab-1').classList.toggle('active', idx === 1);
+            document.getElementById('files-slot-0').classList.toggle('active', idx === 0);
+            document.getElementById('files-slot-1').classList.toggle('active', idx === 1);
             syncUI();
         };
 
         function syncUI() {
             const cfg = slots[activeModelIdx].config;
-            const set = (id, v) => { document.getElementById(id+'-s').value = v; document.getElementById(id+'-n').value = v; };
-            set('uv-u', cfg.offsetU); set('uv-v', cfg.offsetV); set('uv-tile-u', cfg.tilingU); set('uv-tile-v', cfg.tilingV);
-            document.getElementById('mat-emissive-slider').value = cfg.emissive; document.getElementById('mat-emissive-num').value = cfg.emissive;
+            const set = (id, v) => {
+                document.getElementById(id + '-s').value = v;
+                document.getElementById(id + '-n').value = v;
+            };
+
+            set('uv-u', cfg.offsetU);
+            set('uv-v', cfg.offsetV);
+            set('uv-tile-u', cfg.tilingU);
+            set('uv-tile-v', cfg.tilingV);
+            document.getElementById('mat-emissive-slider').value = cfg.emissive;
+            document.getElementById('mat-emissive-num').value = cfg.emissive;
             document.getElementById('mat-tint').value = cfg.tint;
         }
 
-        window.toggleModelVis = (idx) => { slots[idx].config.visible = document.getElementById(`vis-chk-${idx}`).checked; if(slots[idx].root) slots[idx].root.visible = slots[idx].config.visible; };
+        window.toggleModelVis = (idx) => {
+            slots[idx].config.visible = document.getElementById(`vis-chk-${idx}`).checked;
+            if (slots[idx].root) slots[idx].root.visible = slots[idx].config.visible;
+        };
 
-        document.getElementById('input-bg').onchange = (e) => classifyAndLoadImage(e.target.files[0]);
-        document.getElementById('input-texture-0').onchange = (e) => { if(e.target.files[0]) loadTextureToSlot(0, e.target.files[0]); };
-        document.getElementById('input-texture-1').onchange = (e) => { if(e.target.files[0]) loadTextureToSlot(1, e.target.files[0]); };
+        window.toggleBgVis = () => {
+            sceneData[activeSceneType].bgVisible = document.getElementById('bg-visible-chk').checked;
+            updateCameraBackgroundPlane();
+        };
 
-        window.toggleBgVis = () => { sceneData[activeSceneType].bgVisible = document.getElementById('bg-visible-chk').checked; updateBgDisplay(); };
-        function updateBgDisplay() {
-            const data = sceneData[activeSceneType], layer = document.getElementById('bg-layer');
-            if (data.bgVisible && data.bgImg) { layer.style.backgroundImage = `url(${data.bgImg.src})`; layer.style.opacity = 1; }
-            else { layer.style.backgroundImage = 'none'; layer.style.opacity = 0; }
-        }
+        document.getElementById('input-model-master').onchange = (e) => handleBatchFiles(Array.from(e.target.files));
+        document.getElementById('input-bg').onchange = (e) => {
+            if (e.target.files[0]) classifyAndLoadImage(e.target.files[0]);
+        };
+        document.getElementById('input-media-0').onchange = (e) => loadMediaToSlot(0, e.target.files[0]);
+        document.getElementById('input-media-1').onchange = (e) => loadMediaToSlot(1, e.target.files[0]);
 
         ['uv-u', 'uv-v', 'uv-tile-u', 'uv-tile-v'].forEach(id => {
-            const h = (e) => { slots[activeModelIdx].config[{'uv-u':'offsetU','uv-v':'offsetV','uv-tile-u':'tilingU','uv-tile-v':'tilingV'}[id]] = parseFloat(e.target.value); syncUI(); updateMat(activeModelIdx); };
-            document.getElementById(id+'-s').oninput = h; document.getElementById(id+'-n').oninput = h;
+            const map = {
+                'uv-u': 'offsetU',
+                'uv-v': 'offsetV',
+                'uv-tile-u': 'tilingU',
+                'uv-tile-v': 'tilingV'
+            };
+
+            const handler = (e) => {
+                slots[activeModelIdx].config[map[id]] = parseFloat(e.target.value);
+                syncUI();
+                updateMat(activeModelIdx);
+            };
+
+            document.getElementById(id + '-s').oninput = handler;
+            document.getElementById(id + '-n').oninput = handler;
         });
-        document.getElementById('mat-emissive-slider').oninput = (e) => { slots[activeModelIdx].config.emissive = parseFloat(e.target.value); updateMat(activeModelIdx); };
-        document.getElementById('mat-emissive-num').oninput = (e) => { document.getElementById('mat-emissive-slider').value = e.target.value; slots[activeModelIdx].config.emissive = parseFloat(e.target.value); updateMat(activeModelIdx); };
-        document.getElementById('mat-tint').oninput = (e) => { slots[activeModelIdx].config.tint = e.target.value; updateMat(activeModelIdx); };
-        document.getElementById('btn-flipX').onclick = () => { slots[activeModelIdx].config.flipX = !slots[activeModelIdx].config.flipX; updateMat(activeModelIdx); };
-        document.getElementById('btn-flipY').onclick = () => { slots[activeModelIdx].config.flipY = !slots[activeModelIdx].config.flipY; updateMat(activeModelIdx); };
-        document.getElementById('btn-rotate').onclick = () => { slots[activeModelIdx].config.rot = (slots[activeModelIdx].config.rot + 1) % 4; updateMat(activeModelIdx); };
-        document.getElementById('btn-wrap').onclick = () => { slots[activeModelIdx].config.wrap = !slots[activeModelIdx].config.wrap; updateMat(activeModelIdx); };
-        document.getElementById('btn-reset-uv').onclick = () => { Object.assign(slots[activeModelIdx].config, {offsetU:0.00,offsetV:0,tilingU:1,tilingV:1,flipX:false,flipY:false,rot:0,wrap:false}); syncUI(); updateMat(activeModelIdx); };
+
+        document.getElementById('mat-emissive-slider').oninput = (e) => {
+            slots[activeModelIdx].config.emissive = parseFloat(e.target.value);
+            document.getElementById('mat-emissive-num').value = e.target.value;
+            updateMat(activeModelIdx);
+        };
+        document.getElementById('mat-emissive-num').oninput = (e) => {
+            slots[activeModelIdx].config.emissive = parseFloat(e.target.value);
+            document.getElementById('mat-emissive-slider').value = e.target.value;
+            updateMat(activeModelIdx);
+        };
+        document.getElementById('mat-tint').oninput = (e) => {
+            slots[activeModelIdx].config.tint = e.target.value;
+            updateMat(activeModelIdx);
+        };
+        document.getElementById('btn-flipX').onclick = () => {
+            slots[activeModelIdx].config.flipX = !slots[activeModelIdx].config.flipX;
+            updateMat(activeModelIdx);
+        };
+        document.getElementById('btn-flipY').onclick = () => {
+            slots[activeModelIdx].config.flipY = !slots[activeModelIdx].config.flipY;
+            updateMat(activeModelIdx);
+        };
+        document.getElementById('btn-rotate').onclick = () => {
+            slots[activeModelIdx].config.rot = (slots[activeModelIdx].config.rot + 1) % 4;
+            updateMat(activeModelIdx);
+        };
+        document.getElementById('btn-wrap').onclick = () => {
+            slots[activeModelIdx].config.wrap = !slots[activeModelIdx].config.wrap;
+            updateMat(activeModelIdx);
+        };
+        document.getElementById('btn-reset-uv').onclick = () => {
+            Object.assign(slots[activeModelIdx].config, {
+                offsetU: 0.00,
+                offsetV: 0,
+                tilingU: 1,
+                tilingV: 1,
+                flipX: false,
+                flipY: false,
+                rot: 0,
+                wrap: false
+            });
+            syncUI();
+            updateMat(activeModelIdx);
+        };
+
+        function normalizeFPS(fps) {
+            const presets = [24, 25, 29.97, 30, 50, 59.94, 60];
+            return presets.reduce((best, cur) => {
+                return Math.abs(cur - fps) < Math.abs(best - fps) ? cur : best;
+            });
+        }
+
+        function estimateVideoFPS(video, sampleFrames = 60, timeoutMs = 3000) {
+            return new Promise((resolve) => {
+                if (!video || typeof video.requestVideoFrameCallback !== 'function') {
+                    resolve(null);
+                    return;
+                }
+
+                const times = [];
+                let lastMediaTime = null;
+                let done = false;
+
+                const timeout = setTimeout(() => {
+                    if (done) return;
+                    done = true;
+                    resolve(times.length ? normalizeFPS(1 / average(times)) : null);
+                }, timeoutMs);
+
+                function onFrame(now, metadata) {
+                    if (done) return;
+
+                    const t = metadata.mediaTime;
+                    if (lastMediaTime !== null) {
+                        const delta = t - lastMediaTime;
+                        if (delta > 0 && delta < 0.2) times.push(delta);
+                    }
+                    lastMediaTime = t;
+
+                    if (times.length >= sampleFrames) {
+                        done = true;
+                        clearTimeout(timeout);
+                        resolve(normalizeFPS(1 / average(times)));
+                        return;
+                    }
+
+                    video.requestVideoFrameCallback(onFrame);
+                }
+
+                video.requestVideoFrameCallback(onFrame);
+            });
+        }
+
+        function average(values) {
+            return values.reduce((a, b) => a + b, 0) / values.length;
+        }
+
+        function getLoadedVideos() {
+            return slots
+                .map(s => s.videoElement)
+                .filter(v => v && Number.isFinite(v.duration) && v.duration > 0);
+        }
+
+        function capturePlaybackStates(videos) {
+            return videos.map(video => ({
+                video,
+                currentTime: video.currentTime,
+                paused: video.paused,
+                loop: video.loop,
+                muted: video.muted,
+                playbackRate: video.playbackRate
+            }));
+        }
+
+        async function restorePlaybackStates(states) {
+            for (const state of states) {
+                const video = state.video;
+                video.loop = state.loop;
+                video.muted = state.muted;
+                video.playbackRate = state.playbackRate;
+                await waitForSeek(video, state.currentTime);
+                if (state.paused) video.pause();
+                else {
+                    try { await video.play(); } catch (err) { console.warn(err); }
+                }
+            }
+            updateAllTransportUI();
+        }
+
+        async function getExportAudioTracks(videos) {
+            const enabled = document.getElementById('export-audio-enabled').checked;
+            if (!enabled || !videos.length) return [];
+
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) {
+                showToast('이 브라우저는 AudioContext를 지원하지 않습니다. 오디오 없이 export합니다.');
+                return [];
+            }
+
+            if (!exportAudioContext) exportAudioContext = new AudioContextClass();
+            if (exportAudioContext.state === 'suspended') await exportAudioContext.resume();
+            if (!exportAudioDestination) exportAudioDestination = exportAudioContext.createMediaStreamDestination();
+
+            for (const video of videos) {
+                try {
+                    if (!audioSourceMap.has(video)) {
+                        const source = exportAudioContext.createMediaElementSource(video);
+                        source.connect(exportAudioDestination);
+                        audioSourceMap.set(video, source);
+                    }
+                } catch (err) {
+                    console.warn('Audio source creation failed:', err);
+                }
+            }
+
+            return exportAudioDestination.stream.getAudioTracks();
+        }
+
+        async function getExportFPS() {
+            const selected = document.getElementById('export-fps').value;
+            if (selected !== 'auto') return parseFloat(selected);
+
+            const videos = getLoadedVideos();
+            const slotWithFps = slots.find(s => s.sourceFps && s.videoElement);
+            if (slotWithFps) return slotWithFps.sourceFps;
+
+            if (videos[0]) {
+                const fps = await estimateVideoFPS(videos[0], 60, 2500);
+                return fps || 30;
+            }
+
+            return 30;
+        }
+
+        function getExportSize() {
+            const value = document.getElementById('export-size').value;
+            if (value === 'stage') {
+                const size = new THREE.Vector2();
+                renderer.getSize(size);
+                return { w: Math.round(size.x), h: Math.round(size.y) };
+            }
+
+            const [w, h] = value.split('x').map(Number);
+            return { w, h };
+        }
+
+        function getSupportedMimeType(includeAudio = false) {
+            const candidates = includeAudio
+                ? [
+                    'video/webm;codecs=vp9,opus',
+                    'video/webm;codecs=vp8,opus',
+                    'video/webm'
+                ]
+                : [
+                    'video/webm;codecs=vp9',
+                    'video/webm;codecs=vp8',
+                    'video/webm'
+                ];
+
+            return candidates.find(type => MediaRecorder.isTypeSupported(type)) || '';
+        }
+
+        function waitForSeek(video, time = 0) {
+            return new Promise(resolve => {
+                if (!video || !Number.isFinite(video.duration)) {
+                    resolve();
+                    return;
+                }
+
+                const done = () => {
+                    video.removeEventListener('seeked', done);
+                    resolve();
+                };
+
+                video.pause();
+                video.loop = false;
+
+                try {
+                    video.addEventListener('seeked', done, { once: true });
+                    video.currentTime = Math.min(Math.max(time, 0), Math.max(video.duration - 0.02, 0));
+                } catch (err) {
+                    video.removeEventListener('seeked', done);
+                    resolve();
+                }
+
+                setTimeout(() => {
+                    video.removeEventListener('seeked', done);
+                    resolve();
+                }, 800);
+            });
+        }
+
+        function nextFrame() {
+            return new Promise(resolve => requestAnimationFrame(() => resolve()));
+        }
+
+        async function exportWebM() {
+            if (isExporting) return;
+
+            if (!window.MediaRecorder) {
+                showToast('이 브라우저는 MediaRecorder를 지원하지 않습니다.');
+                return;
+            }
+
+            const audioEnabled = document.getElementById('export-audio-enabled').checked;
+            const mimeType = getSupportedMimeType(audioEnabled);
+            if (!mimeType) {
+                showToast(audioEnabled
+                    ? '이 브라우저에서 오디오 포함 WebM MIME을 찾지 못했습니다.'
+                    : '이 브라우저에서 WebM 녹화 MIME을 찾지 못했습니다.');
+                return;
+            }
+
+            const btn = document.getElementById('btn-export-webm');
+            btn.disabled = true;
+            btn.innerText = '⏳ Exporting...';
+            isExporting = true;
+
+            const oldSize = new THREE.Vector2();
+            renderer.getSize(oldSize);
+            const oldPixelRatio = renderer.getPixelRatio();
+            const oldAspect = camera.aspect;
+            const videos = getLoadedVideos();
+            const playbackStates = capturePlaybackStates(videos);
+
+            try {
+                const { w, h } = getExportSize();
+                const fps = await getExportFPS();
+                const bitrateMbps = parseFloat(document.getElementById('export-bitrate').value) || 16;
+                const bitrate = bitrateMbps * 1000 * 1000;
+                const duration = videos.length
+                    ? Math.max(...videos.map(v => Number.isFinite(v.duration) ? v.duration : 0))
+                    : parseFloat(document.getElementById('export-static-duration').value || '5');
+
+                setExportStatus(`Preparing...<br><strong>${w} x ${h}</strong> / <strong>${fps} fps</strong> / <strong>${duration.toFixed(2)} sec</strong>${audioEnabled ? '<br>Audio: ON' : '<br>Audio: OFF'}`);
+
+                renderer.setPixelRatio(1);
+                renderer.setSize(w, h, false);
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+                updateCameraBackgroundPlane();
+
+                for (const video of videos) await waitForSeek(video, 0);
+                renderer.render(scene, camera);
+                await nextFrame();
+
+                const stream = renderer.domElement.captureStream(fps);
+                const audioTracks = await getExportAudioTracks(videos);
+                if (audioTracks.length) {
+                    for (const video of videos) video.muted = false;
+                    audioTracks.forEach(track => stream.addTrack(track));
+                }
+
+                const recorder = new MediaRecorder(stream, {
+                    mimeType,
+                    videoBitsPerSecond: bitrate
+                });
+
+                const chunks = [];
+                recorder.ondataavailable = (e) => {
+                    if (e.data && e.data.size > 0) chunks.push(e.data);
+                };
+
+                const stopPromise = new Promise(resolve => {
+                    recorder.onstop = resolve;
+                });
+
+                recorder.start(250);
+
+                for (const video of videos) {
+                    video.loop = false;
+                    video.playbackRate = 1;
+                    try { await video.play(); } catch (err) { console.warn(err); }
+                }
+
+                const startTime = performance.now();
+                const progressTimer = setInterval(() => {
+                    const elapsed = (performance.now() - startTime) / 1000;
+                    const pct = Math.min(100, (elapsed / duration) * 100).toFixed(1);
+                    setExportStatus(`Recording... <strong>${pct}%</strong><br>${elapsed.toFixed(2)} / ${duration.toFixed(2)} sec${audioTracks.length ? '<br>Audio: recording' : ''}`);
+                }, 250);
+
+                setTimeout(() => {
+                    if (recorder.state !== 'inactive') recorder.stop();
+                }, Math.max(1, duration) * 1000 + 200);
+
+                await stopPromise;
+                clearInterval(progressTimer);
+                stream.getVideoTracks().forEach(track => track.stop());
+
+                const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.download = `Signage_${activeSceneType}_${Date.now()}.webm`;
+                link.href = url;
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+                setExportStatus(`Done.<br><strong>${(blob.size / 1024 / 1024).toFixed(2)} MB</strong>${audioTracks.length ? '<br>Audio: included' : ''}`);
+                showToast('WebM export complete');
+            } catch (err) {
+                console.error(err);
+                setExportStatus(`Export failed.<br>${err.message || err}`);
+                showToast('WebM export failed. 콘솔을 확인하세요.');
+            } finally {
+                await restorePlaybackStates(playbackStates);
+                renderer.setPixelRatio(oldPixelRatio);
+                renderer.setSize(oldSize.x, oldSize.y, false);
+                camera.aspect = oldAspect;
+                camera.updateProjectionMatrix();
+                updateCameraBackgroundPlane();
+                resizeStage();
+
+                isExporting = false;
+                btn.disabled = false;
+                btn.innerText = '🎬 Export WebM';
+            }
+        }
+
+        document.getElementById('btn-export-webm').onclick = exportWebM;
 
         async function renderHighRes() {
-            const scaleOpt = document.getElementById('save-scale').value, curScene = sceneData[activeSceneType];
-            let w = 3000, h = 2000;
-            if (scaleOpt === "original") { w = curScene.bgImg?.naturalWidth || 8256; h = curScene.bgImg?.naturalHeight || 5504; }
-            else if (scaleOpt === "2") { w = 6000; h = 4000; }
+            const scaleOpt = document.getElementById('save-scale').value;
+            const curScene = sceneData[activeSceneType];
+            let w = 3000;
+            let h = 2000;
 
+            if (scaleOpt === 'original') {
+                w = curScene.bgImageSize?.width || 3000;
+                h = curScene.bgImageSize?.height || 2000;
+            } else if (scaleOpt === '2') {
+                w = 6000;
+                h = 4000;
+            }
+
+            const oldAspect = camera.aspect;
             const rt = new THREE.WebGLRenderTarget(w, h, { format: THREE.RGBAFormat });
-            rt.texture.colorSpace = THREE.SRGBColorSpace; 
-            
-            const originalAspect = camera.aspect; camera.aspect = w / h; camera.updateProjectionMatrix();
-            renderer.setRenderTarget(rt); renderer.clear(); renderer.render(scene, camera);
-            const buffer = new Uint8ClampedArray(w * h * 4); renderer.readRenderTargetPixels(rt, 0, 0, w, h, buffer);
-            renderer.setRenderTarget(null); camera.aspect = originalAspect; camera.updateProjectionMatrix(); rt.dispose();
-            
-            const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+            rt.texture.colorSpace = THREE.SRGBColorSpace;
+
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            updateCameraBackgroundPlane();
+
+            renderer.setRenderTarget(rt);
+            renderer.clear();
+            renderer.render(scene, camera);
+
+            const buffer = new Uint8ClampedArray(w * h * 4);
+            renderer.readRenderTargetPixels(rt, 0, 0, w, h, buffer);
+            renderer.setRenderTarget(null);
+
+            camera.aspect = oldAspect;
+            camera.updateProjectionMatrix();
+            updateCameraBackgroundPlane();
+            rt.dispose();
+
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
             const ctx = canvas.getContext('2d');
-            if (curScene.bgVisible && curScene.bgImg) ctx.drawImage(curScene.bgImg, 0, 0, w, h);
-            
-            const tempCanvas = document.createElement('canvas'); tempCanvas.width = w; tempCanvas.height = h;
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = w;
+            tempCanvas.height = h;
             tempCanvas.getContext('2d').putImageData(new ImageData(buffer, w, h), 0, 0);
-            ctx.save(); ctx.scale(1, -1); ctx.drawImage(tempCanvas, 0, -h); ctx.restore();
+
+            ctx.save();
+            ctx.scale(1, -1);
+            ctx.drawImage(tempCanvas, 0, -h);
+            ctx.restore();
+
             return canvas.toDataURL('image/png');
         }
 
         document.getElementById('btn-save-pc').onclick = async () => {
-            const b = document.getElementById('btn-save-pc'); b.innerText = "⏳ Rendering...";
+            const b = document.getElementById('btn-save-pc');
+            b.innerText = '⏳ Rendering...';
             const dataUrl = await renderHighRes();
-            const link = document.createElement('a'); link.download = `Signage_${activeSceneType}_${Date.now()}.png`; link.href = dataUrl; link.click();
-            b.innerText = "💻 PC Save"; resizeStage();
+            const link = document.createElement('a');
+            link.download = `Signage_${activeSceneType}_${Date.now()}.png`;
+            link.href = dataUrl;
+            link.click();
+            b.innerText = '💻 PC Save';
+            resizeStage();
         };
 
         document.getElementById('btn-save-mobile').onclick = async () => {
-            const b = document.getElementById('btn-save-mobile'); b.innerText = "⏳ Rendering...";
+            const b = document.getElementById('btn-save-mobile');
+            b.innerText = '⏳ Rendering...';
             const dataUrl = await renderHighRes();
-            document.getElementById('mobile-preview-img').src = dataUrl; document.getElementById('mobile-overlay').style.display = 'flex';
-            b.innerText = "📱 Mobile Save"; resizeStage();
+            document.getElementById('mobile-preview-img').src = dataUrl;
+            document.getElementById('mobile-overlay').style.display = 'flex';
+            b.innerText = '📱 Mobile Save';
+            resizeStage();
         };
 
-        window.closeMobileOverlay = () => document.getElementById('mobile-overlay').style.display = 'none';
-        function showToast(m) { const t = document.getElementById('toast'); t.innerText = m; t.style.opacity = 1; setTimeout(() => t.style.opacity = 0, 3000); }
-        
-        function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
-        
-        // --- Init ---
-        switchScene('front'); 
+        window.closeMobileOverlay = () => {
+            document.getElementById('mobile-overlay').style.display = 'none';
+        };
+
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+            updateAllTransportUI();
+        }
+
+        switchScene('front');
+        resizeStage();
         animate();
-
-        // Start Auto Load
         window.addEventListener('load', loadGitHubAssets);
-
     </script>
 </body>
 </html>
