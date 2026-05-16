@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUUX Mockup Generator - Video Export Edition</title>
+    <title>LUUX Mockup Generator - Video/MP4 Export Edition</title>
     <style>
         :root {
             --panel-bg: rgba(20, 20, 20, 0.95);
@@ -558,7 +558,16 @@
 
         <div class="divider"></div>
 
-        <h3>WebM Export</h3>
+        <h3>Video Export</h3>
+        <div class="control-group">
+            <div class="control-label">Export Format</div>
+            <select id="export-format">
+                <option value="webm" selected>WebM - Recommended</option>
+                <option value="mp4">MP4 H.264 - Experimental</option>
+            </select>
+            <div class="hint">MP4는 브라우저 지원 상태에 따라 실패할 수 있습니다. 실패 시 WebM을 사용하세요.</div>
+        </div>
+
         <div class="control-group">
             <div class="control-label">Export FPS</div>
             <select id="export-fps">
@@ -600,13 +609,14 @@
             <div class="hint">ON이면 로드된 동영상 텍스처의 오디오를 WebM에 함께 기록합니다. 여러 동영상이 있으면 믹스됩니다.</div>
         </div>
 
-        <button id="btn-export-webm" class="primary-purple" style="width:100%;">🎬 Export WebM</button>
+        <button id="btn-export-webm" class="primary-purple" style="width:100%;">🎬 Export Video</button>
         <div id="export-status" class="status-box">Ready.</div>
 
         <div class="divider"></div>
         <div style="font-size: 10px; color:#666; text-align: center; line-height:1.45;">
-            2026 / LEE JUNGHO / LunarGraphics / ChannelA BNC<br>
-            V7.0 Video Export Edition
+            LUUX Signage Simulation WebKit V7.1 Video / MP4 Export Edition
+            2026 / LEE JUNGHO / LUNARGRAPHICS /  ChannelA BNC<br>
+            Copyright(c) LEE JUNGHO. All rights reserved.
         </div>
     </div>
 
@@ -1615,20 +1625,43 @@
             return { w, h };
         }
 
-        function getSupportedMimeType(includeAudio = false) {
-            const candidates = includeAudio
-                ? [
-                    'video/webm;codecs=vp9,opus',
-                    'video/webm;codecs=vp8,opus',
-                    'video/webm'
-                ]
-                : [
-                    'video/webm;codecs=vp9',
-                    'video/webm;codecs=vp8',
-                    'video/webm'
-                ];
+        function getSupportedMimeType(format = 'webm', includeAudio = false) {
+            let candidates = [];
+
+            if (format === 'mp4') {
+                candidates = includeAudio
+                    ? [
+                        'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+                        'video/mp4;codecs=avc1.4D401E,mp4a.40.2',
+                        'video/mp4;codecs=avc1.640028,mp4a.40.2',
+                        'video/mp4'
+                    ]
+                    : [
+                        'video/mp4;codecs=avc1.42E01E',
+                        'video/mp4;codecs=avc1.4D401E',
+                        'video/mp4;codecs=avc1.640028',
+                        'video/mp4'
+                    ];
+            } else {
+                candidates = includeAudio
+                    ? [
+                        'video/webm;codecs=vp9,opus',
+                        'video/webm;codecs=vp8,opus',
+                        'video/webm'
+                    ]
+                    : [
+                        'video/webm;codecs=vp9',
+                        'video/webm;codecs=vp8',
+                        'video/webm'
+                    ];
+            }
 
             return candidates.find(type => MediaRecorder.isTypeSupported(type)) || '';
+        }
+
+        function getExportExtension(format, mimeType) {
+            if (format === 'mp4' || mimeType.includes('mp4')) return 'mp4';
+            return 'webm';
         }
 
         function waitForSeek(video, time = 0) {
@@ -1673,12 +1706,15 @@
                 return;
             }
 
+            const exportFormat = document.getElementById('export-format').value;
             const audioEnabled = document.getElementById('export-audio-enabled').checked;
-            const mimeType = getSupportedMimeType(audioEnabled);
+            const mimeType = getSupportedMimeType(exportFormat, audioEnabled);
             if (!mimeType) {
-                showToast(audioEnabled
-                    ? '이 브라우저에서 오디오 포함 WebM MIME을 찾지 못했습니다.'
-                    : '이 브라우저에서 WebM 녹화 MIME을 찾지 못했습니다.');
+                showToast(exportFormat === 'mp4'
+                    ? '이 브라우저는 MediaRecorder MP4/H.264 저장을 지원하지 않습니다. WebM을 사용하세요.'
+                    : (audioEnabled
+                        ? '이 브라우저에서 오디오 포함 WebM MIME을 찾지 못했습니다.'
+                        : '이 브라우저에서 WebM 녹화 MIME을 찾지 못했습니다.'));
                 return;
             }
 
@@ -1703,7 +1739,7 @@
                     ? Math.max(...videos.map(v => Number.isFinite(v.duration) ? v.duration : 0))
                     : parseFloat(document.getElementById('export-static-duration').value || '5');
 
-                setExportStatus(`Preparing...<br><strong>${w} x ${h}</strong> / <strong>${fps} fps</strong> / <strong>${duration.toFixed(2)} sec</strong>${audioEnabled ? '<br>Audio: ON' : '<br>Audio: OFF'}`);
+                setExportStatus(`Preparing...<br><strong>${w} x ${h}</strong> / <strong>${fps} fps</strong> / <strong>${duration.toFixed(2)} sec</strong>${audioEnabled ? '<br>Audio: ON' : '<br>Audio: OFF'}<br>Format: <strong>${exportFormat.toUpperCase()}</strong><br>MIME: ${mimeType}`);
 
                 renderer.setPixelRatio(1);
                 renderer.setSize(w, h, false);
@@ -1759,20 +1795,21 @@
                 clearInterval(progressTimer);
                 stream.getVideoTracks().forEach(track => track.stop());
 
-                const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
+                const extension = getExportExtension(exportFormat, mimeType);
+                const blob = new Blob(chunks, { type: mimeType || (extension === 'mp4' ? 'video/mp4' : 'video/webm') });
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
-                link.download = `Signage_${activeSceneType}_${Date.now()}.webm`;
+                link.download = `Signage_${activeSceneType}_${Date.now()}.${extension}`;
                 link.href = url;
                 link.click();
                 setTimeout(() => URL.revokeObjectURL(url), 5000);
 
                 setExportStatus(`Done.<br><strong>${(blob.size / 1024 / 1024).toFixed(2)} MB</strong>${audioTracks.length ? '<br>Audio: included' : ''}`);
-                showToast('WebM export complete');
+                showToast(`${exportFormat.toUpperCase()} export complete`);
             } catch (err) {
                 console.error(err);
                 setExportStatus(`Export failed.<br>${err.message || err}`);
-                showToast('WebM export failed. 콘솔을 확인하세요.');
+                showToast(`${exportFormat.toUpperCase()} export failed. 콘솔을 확인하세요.`);
             } finally {
                 await restorePlaybackStates(playbackStates);
                 renderer.setPixelRatio(oldPixelRatio);
@@ -1784,7 +1821,7 @@
 
                 isExporting = false;
                 btn.disabled = false;
-                btn.innerText = '🎬 Export WebM';
+                btn.innerText = '🎬 Export Video';
             }
         }
 
