@@ -970,7 +970,7 @@
         }
 
         window.setLensShift = (axis, value) => {
-            const v = Math.min(Math.max(parseFloat(value) || 0, -100), 100);
+            const v = Math.min(Math.max(parseFloat(value) || 0, -1000), 1000);
             if (axis === 'x') currentLensShiftX = v;
             if (axis === 'y') currentLensShiftY = v;
             updateCameraProjection();
