@@ -651,7 +651,7 @@
 
         <div class="divider"></div>
         <div style="font-size: 10px; color:#666; text-align: center; line-height:1.45;">
-            2026 / LEE JUNGHO / ChannelA B&amp;C<br>
+            2026 / LEE JUNGHO / LUNARGRAPHICS / ChannelA B&amp;C<br>
             V7.1 Video / MP4 Export Edition
         </div>
     </div>
@@ -992,6 +992,27 @@
             showToast('Lens shift reset');
         };
 
+        function createUnlitScreenMaterial() {
+            return new THREE.MeshBasicMaterial({
+                map: null,
+                color: new THREE.Color(1, 1, 1),
+                transparent: true,
+                opacity: 1.0,
+                side: THREE.DoubleSide,
+                depthTest: true,
+                depthWrite: true,
+                toneMapped: false
+            });
+        }
+
+        function updateScreenMaterialColor(material, tintHex, intensity) {
+            if (!material) return;
+            const tint = new THREE.Color(tintHex || '#ffffff');
+            const gain = Math.max(0, parseFloat(intensity) || 0);
+            material.color.setRGB(tint.r * gain, tint.g * gain, tint.b * gain);
+            material.needsUpdate = true;
+        }
+
         function applyMeshVisibility(idx) {
             const s = slots[idx];
             if (!s.root) return;
@@ -1008,7 +1029,17 @@
 
                 if (isMatch) {
                     s.targetMesh = child;
-                    if (child.material) child.material = child.material.clone();
+
+                    // Signage screen should behave as an unlit display surface.
+                    // Do not reuse GLB PBR material, because it may contain lighting, metalness,
+                    // roughness, AO, baseColor factor, normal map, or other color-changing properties.
+                    if (!child.material || !child.material.userData?.isUnlitScreenMaterial) {
+                        if (child.material && typeof child.material.dispose === 'function') {
+                            child.material.dispose();
+                        }
+                        child.material = createUnlitScreenMaterial();
+                        child.material.userData.isUnlitScreenMaterial = true;
+                    }
                 }
             });
 
@@ -1424,7 +1455,14 @@
             const s = slots[idx];
             if (!s.targetMesh) return;
 
-            const m = s.targetMesh.material;
+            let m = s.targetMesh.material;
+            if (!m || !m.userData?.isUnlitScreenMaterial) {
+                if (m && typeof m.dispose === 'function') m.dispose();
+                m = createUnlitScreenMaterial();
+                m.userData.isUnlitScreenMaterial = true;
+                s.targetMesh.material = m;
+            }
+
             let tex = null;
 
             if (s.config.camOverride) tex = sharedVideoTexture;
@@ -1442,14 +1480,11 @@
                 tex.wrapS = tex.wrapT = s.config.wrap ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
                 tex.needsUpdate = true;
                 m.map = tex;
-                m.emissiveMap = tex;
             } else {
                 m.map = null;
-                m.emissiveMap = null;
             }
 
-            m.emissive = new THREE.Color(s.config.tint);
-            m.emissiveIntensity = s.config.emissive;
+            updateScreenMaterialColor(m, s.config.tint, s.config.emissive);
             m.transparent = true;
             m.needsUpdate = true;
         }
