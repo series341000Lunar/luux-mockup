@@ -517,6 +517,9 @@
             <button id="btn-rotate">Rot 90°</button>
         </div>
         <div class="btn-group">
+            <button id="btn-preset-16x9">Apply 16:9 Preset</button>
+        </div>
+        <div class="btn-group">
             <button id="btn-wrap">Wrap</button>
             <button id="btn-reset-uv">Reset UV</button>
         </div>
@@ -575,16 +578,16 @@
                 <span id="lens-shift-x-readout">0</span>
             </div>
             <div class="slider-row">
-                <input type="range" id="lens-shift-x-slider" min="-1000" max="1000" step="1" value="0">
-                <input class="num-small" type="number" id="lens-shift-x-num" min="-1000" max="1000" step="1" value="0">
+                <input type="range" id="lens-shift-x-slider" min="-100" max="100" step="1" value="0">
+                <input class="num-small" type="number" id="lens-shift-x-num" min="-100" max="100" step="1" value="0">
             </div>
             <div class="control-label" style="margin-top:7px;">
                 <span>Lens Shift Y</span>
                 <span id="lens-shift-y-readout">0</span>
             </div>
             <div class="slider-row">
-                <input type="range" id="lens-shift-y-slider" min="-1000" max="1000" step="1" value="0">
-                <input class="num-small" type="number" id="lens-shift-y-num" min="-1000" max="1000" step="1" value="0">
+                <input type="range" id="lens-shift-y-slider" min="-100" max="100" step="1" value="0">
+                <input class="num-small" type="number" id="lens-shift-y-num" min="-100" max="100" step="1" value="0">
             </div>
             <button id="btn-reset-lens-shift" style="width:100%; margin-top:5px;">Reset Lens Shift</button>
             <div id="lens-shift-status" class="hint">Projection offset: X 0 / Y 0</div>
@@ -649,7 +652,7 @@
         <div class="divider"></div>
         <div style="font-size: 10px; color:#666; text-align: center; line-height:1.45;">
             2026 / LEE JUNGHO / ChannelA B&amp;C<br>
-            Signage Mokup Generator V7.1 Video / MP4 Export Edition
+            V7.1 Video / MP4 Export Edition
         </div>
     </div>
 
@@ -909,8 +912,10 @@
             const fullH = Math.max(1, Math.round(size.y));
 
             const shiftScale = 0.005;
-            const offsetX = -currentLensShiftX * shiftScale * fullW;
-            const offsetY = currentLensShiftY * shiftScale * fullH;
+            const effectiveShiftX = currentLensShiftX * currentCameraZoom;
+            const effectiveShiftY = currentLensShiftY * currentCameraZoom;
+            const offsetX = -effectiveShiftX * shiftScale * fullW;
+            const offsetY = effectiveShiftY * shiftScale * fullH;
 
             if (currentLensShiftX !== 0 || currentLensShiftY !== 0) {
                 camera.setViewOffset(fullW, fullH, offsetX, offsetY, fullW, fullH);
@@ -966,11 +971,15 @@
             if (yNum) yNum.value = currentLensShiftY;
             if (xReadout) xReadout.innerText = currentLensShiftX;
             if (yReadout) yReadout.innerText = currentLensShiftY;
-            if (status) status.innerText = `Projection offset: X ${currentLensShiftX} / Y ${currentLensShiftY}`;
+            if (status) {
+                const effectiveX = currentLensShiftX * currentCameraZoom;
+                const effectiveY = currentLensShiftY * currentCameraZoom;
+                status.innerText = `Projection offset: X ${currentLensShiftX} / Y ${currentLensShiftY} / Effective: X ${effectiveX.toFixed(1)} / Y ${effectiveY.toFixed(1)}`;
+            }
         }
 
         window.setLensShift = (axis, value) => {
-            const v = Math.min(Math.max(parseFloat(value) || 0, -1000), 1000);
+            const v = Math.min(Math.max(parseFloat(value) || 0, -100), 100);
             if (axis === 'x') currentLensShiftX = v;
             if (axis === 'y') currentLensShiftY = v;
             updateCameraProjection();
@@ -1624,6 +1633,33 @@
             updateMat(activeModelIdx);
         };
 
+        function apply16x9Preset() {
+            const cfg = slots[activeModelIdx].config;
+
+            if (activeModelIdx === 0) {
+                Object.assign(cfg, {
+                    offsetU: 0.2691,
+                    offsetV: 0,
+                    tilingU: 0.4617,
+                    tilingV: 1
+                });
+                showToast('LUUX 16:9 UV preset applied');
+            } else {
+                Object.assign(cfg, {
+                    offsetU: 0,
+                    offsetV: 0.2247,
+                    tilingU: 1,
+                    tilingV: 0.5506
+                });
+                showToast('ILMIN 16:9 UV preset applied');
+            }
+
+            syncUI();
+            updateMat(activeModelIdx);
+        }
+
+        document.getElementById('btn-preset-16x9').onclick = apply16x9Preset;
+
         function normalizeFPS(fps) {
             const presets = [24, 25, 29.97, 30, 50, 59.94, 60];
             return presets.reduce((best, cur) => {
@@ -1884,8 +1920,8 @@
                 renderer.setPixelRatio(1);
                 renderer.setSize(w, h, false);
                 camera.aspect = w / h;
-                camera.updateProjectionMatrix();
                 updateCameraBackgroundPlane();
+                updateCameraProjection();
 
                 for (const video of videos) await waitForSeek(video, 0);
                 renderer.render(scene, camera);
@@ -1986,8 +2022,8 @@
             rt.texture.colorSpace = THREE.SRGBColorSpace;
 
             camera.aspect = w / h;
-            camera.updateProjectionMatrix();
             updateCameraBackgroundPlane();
+            updateCameraProjection();
 
             renderer.setRenderTarget(rt);
             renderer.clear();
