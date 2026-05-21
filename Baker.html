@@ -1,0 +1,2038 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Signage Baker 4728x5760 - Media Merge v01</title>
+  <style>
+    :root {
+      --panel-bg: rgba(20, 20, 20, 0.95);
+      --line: #444;
+      --blue: #4db8ff;
+      --green: #4caf50;
+      --red: #f44336;
+      --purple: #8e44ad;
+      --yellow: #ffd700;
+      --text: #fff;
+      --muted: #aaa;
+    }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      color: var(--text);
+      font-family: 'Noto Sans KR', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #stage {
+      position: relative;
+      background-color: #111;
+      overflow: hidden;
+      box-shadow: 0 0 50px rgba(0,0,0,0.85);
+      background-image:
+        linear-gradient(45deg, #1a1a1a 25%, transparent 25%),
+        linear-gradient(-45deg, #1a1a1a 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #1a1a1a 75%),
+        linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+    }
+
+    #canvas-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .panel {
+      position: fixed;
+      z-index: 100;
+      top: 20px;
+      width: 318px;
+      max-height: 94vh;
+      box-sizing: border-box;
+      overflow-y: auto;
+      background: var(--panel-bg);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 12px;
+      backdrop-filter: blur(5px);
+    }
+
+    .panel::-webkit-scrollbar { width: 6px; }
+    .panel::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+    #ui-left { left: 20px; }
+    #ui-right { right: 20px; }
+
+    h3 {
+      margin: 0 0 12px 0;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--line);
+      color: var(--blue);
+      font-size: 14px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .divider { height: 1px; background: var(--line); margin: 14px 0; }
+    .control-group { margin-bottom: 12px; }
+    .control-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; color: var(--muted); }
+    .hint { color: #777; font-size: 10px; line-height: 1.45; margin-top: 5px; }
+    .small { font-size: 10px; color: #777; line-height: 1.45; }
+
+    input[type="file"], input[type="color"], select, input[type="number"] {
+      width: 100%;
+      box-sizing: border-box;
+      background: #333;
+      border: 1px solid #555;
+      color: #fff;
+      border-radius: 4px;
+      padding: 6px;
+    }
+
+    input[type="number"] {
+      color: var(--yellow);
+      text-align: right;
+      font-weight: 800;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      height: 4px;
+      background: #555;
+      outline: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--blue);
+      border: 2px solid #fff;
+    }
+
+    .slider-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .num-small { width: 70px !important; }
+    .btn-group { display: flex; gap: 5px; margin-top: 5px; }
+
+    button {
+      flex: 1;
+      cursor: pointer;
+      border: 1px solid #555;
+      border-radius: 4px;
+      color: #fff;
+      background: #333;
+      padding: 8px;
+      font-weight: 700;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    button:hover { background: #444; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    button.active-btn { background: var(--blue); color: #000; border-color: #fff; }
+    .primary-green { background: linear-gradient(135deg, #4caf50, #2e7d32); border: none; }
+    .primary-blue { background: linear-gradient(135deg, #2196F3, #1976D2); border: none; }
+    .primary-red { background: linear-gradient(135deg, #f44336, #b71c1c); border: none; }
+    .primary-purple { background: linear-gradient(135deg, #8e44ad, #5e3370); border: none; }
+
+    .tab-bar { display: flex; gap: 2px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .tab-btn {
+      flex: 1;
+      padding: 8px 4px;
+      border: none;
+      border-radius: 8px 8px 0 0;
+      background: #222;
+      color: #888;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .tab-btn.active { background: #333; color: var(--blue); border-bottom: 2px solid var(--blue); }
+
+    .slot-panel { display: none; }
+    .slot-panel.active { display: block; }
+
+    .status-box {
+      margin-top: 6px;
+      padding: 7px;
+      background: #1d1d1d;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #aaa;
+      font-size: 10px;
+      line-height: 1.45;
+      word-break: break-all;
+    }
+    .status-box strong { color: var(--blue); }
+    .status-ok { color: var(--green); font-weight: 800; }
+    .status-warn { color: var(--yellow); font-weight: 800; }
+    .status-bad { color: var(--red); font-weight: 800; }
+
+    .drop-slot {
+      height: 45px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      border: 1px solid #555;
+      border-radius: 4px;
+      background: #222;
+      color: #888;
+      font-weight: 800;
+      font-size: 11px;
+      cursor: copy;
+      transition: 0.15s;
+    }
+    .drop-slot.active-drop { border-color: var(--blue); background: rgba(77,184,255,0.18); color: #fff; }
+    .drop-slot.has-file { border-color: var(--green); background: rgba(76,175,80,0.1); color: var(--green); }
+
+    .transport-row { display: flex; align-items: center; gap: 6px; margin-top: 7px; }
+    .transport-row button { flex: 0 0 72px; padding: 7px 6px; }
+    .time-readout { margin-top: 4px; color: #888; font-size: 10px; text-align: right; font-variant-numeric: tabular-nums; }
+
+    .vis-label { display: flex; align-items: center; gap: 6px; color: #fff; font-weight: 800; cursor: pointer; }
+
+    #cam-selector-ui { display: none; margin-top: 8px; padding: 8px; border: 1px solid var(--blue); border-radius: 4px; background: #222; }
+
+    #toast {
+      position: fixed;
+      left: 50%;
+      bottom: 30px;
+      transform: translateX(-50%);
+      z-index: 3000;
+      max-width: 70vw;
+      padding: 10px 20px;
+      border-radius: 20px;
+      background: rgba(76,175,80,0.92);
+      color: #fff;
+      font-weight: 800;
+      text-align: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.35s;
+    }
+
+    #drop-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      border: 5px dashed var(--blue);
+      box-sizing: border-box;
+      background: rgba(77,184,255,0.18);
+    }
+    #drop-overlay.active { display: flex; }
+    #drop-overlay .msg { padding: 20px 40px; border-radius: 50px; color: #000; background: var(--blue); font-weight: 900; font-size: 20px; }
+  </style>
+</head>
+<body>
+  <div id="drop-overlay"><div class="msg">GLB / Image / Video / Sequence Folder Drop</div></div>
+
+  <div id="stage"><div id="canvas-container"></div></div>
+  <div id="toast">메시지</div>
+
+  <div id="ui-left" class="panel">
+    <h3>Auto / Manual GLB Load</h3>
+    <div class="control-group">
+      <div class="control-label">Front Scene GLB</div>
+      <input type="file" id="input-glb-front" accept=".glb,.gltf">
+      <div id="model-status-front" class="status-box">Auto loading: ./assets/Baker_75f_Front_v1.glb</div>
+    </div>
+    <div class="control-group">
+      <div class="control-label">Back Scene GLB</div>
+      <input type="file" id="input-glb-back" accept=".glb,.gltf">
+      <div id="model-status-back" class="status-box">Auto loading: ./assets/Baker_75f_Back_v1.glb</div>
+    </div>
+    <div class="hint">GitHub Pages 기준으로 assets 폴더의 GLB를 자동 로딩합니다. 수동 업로드는 자동 로딩 실패 시 대체용입니다.</div>
+
+    <div class="divider"></div>
+
+    <h3>Quick Media Update</h3>
+    <div class="control-group">
+      <div id="drop-media-0" class="drop-slot">Slot A<br>Image / Video Drop</div>
+    </div>
+    <div class="control-group">
+      <div id="drop-media-1" class="drop-slot">Slot B<br>Image / Video Drop</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <h3>Image Sequence Input</h3>
+    <div class="control-group">
+      <div class="control-label">Target Slot</div>
+      <select id="seq-target-slot">
+        <option value="0" selected>Slot A</option>
+        <option value="1">Slot B</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <div class="control-label">Select Folder</div>
+      <input type="file" id="input-sequence-folder" accept=".png,.jpg,.jpeg,image/png,image/jpeg" webkitdirectory directory multiple>
+      <div class="hint">PNG / JPG / JPEG만 필터링합니다. 파일명 오름차순으로 처리합니다.</div>
+      <div id="sequence-status" class="status-box">No image sequence loaded.</div>
+    </div>
+    <div class="control-group">
+      <div class="control-label">Frame Range (1-based, inclusive)</div>
+      <div class="slider-row">
+        <input class="num-small" type="number" id="seq-start-frame" min="1" max="99999" step="1" value="1">
+        <span style="color:#777; font-size:11px; min-width:14px; text-align:center;">to</span>
+        <input class="num-small" type="number" id="seq-end-frame" min="1" max="99999" step="1" value="120">
+      </div>
+      <div class="hint">예: 1 to 120, 241 to 480. 로드된 시퀀스 안에서 원하는 구간만 베이크합니다.</div>
+    </div>
+    <div class="btn-group">
+      <button id="btn-seq-preview-first">Preview Start</button>
+      <button id="btn-seq-clear">Clear Seq</button>
+    </div>
+    <button id="btn-export-input-seq" class="primary-blue" style="width:100%; margin-top:6px;">🧩 Bake Loaded Image Sequence ZIP</button>
+
+    <div class="divider"></div>
+
+    <h3>Direct Folder Save</h3>
+    <div class="control-group">
+      <button id="btn-select-output-folder" class="primary-purple" style="width:100%;">📁 Select Output Folder</button>
+      <div id="direct-save-status" class="status-box">No output folder selected.<br>Chrome/Edge + localhost/HTTPS 권장.</div>
+    </div>
+    <div class="btn-group">
+      <button id="btn-save-seq-direct" class="primary-green">💾 Save Range Direct</button>
+      <button id="btn-stop-direct-save" class="primary-red" disabled>Stop</button>
+    </div>
+    <div class="hint">선택한 폴더에 ZIP 없이 Baking_원본파일명.png 형식으로 프레임을 직접 저장합니다.</div>
+
+    <h3>Media Slot</h3>
+    <div class="tab-bar">
+      <button class="tab-btn active" id="slot-tab-0" onclick="switchSlot(0)">Slot A</button>
+      <button class="tab-btn" id="slot-tab-1" onclick="switchSlot(1)">Slot B</button>
+    </div>
+
+    <div id="slot-panel-0" class="slot-panel active">
+      <label class="vis-label"><input type="checkbox" id="slot-visible-0" checked onchange="toggleSlotVisible(0)"> 👁️ Slot A Surface Visible</label>
+      <div class="control-group" style="margin-top:10px;">
+        <div class="control-label">Load Media</div>
+        <input type="file" id="input-media-0" accept="image/*,video/*">
+        <div id="media-status-0" class="status-box">No media loaded.</div>
+      </div>
+      <div class="transport-row">
+        <button id="btn-play-0" onclick="toggleSlotPlayback(0)" disabled>▶ Play</button>
+        <input type="range" id="seek-0" min="0" max="1000" step="1" value="0" oninput="seekSlot(0, this.value)" disabled>
+      </div>
+      <div id="time-0" class="time-readout">00:00 / 00:00</div>
+      <label class="vis-label" style="margin-top:8px;"><input type="checkbox" id="loop-0" checked onchange="setSlotLoop(0, this.checked)"> Loop</label>
+      <div class="btn-group">
+        <button id="btn-webcam-0" onclick="toggleWebcamForSlot(0)">📷 Webcam</button>
+        <button onclick="clearSlotMedia(0)">Clear</button>
+      </div>
+    </div>
+
+    <div id="slot-panel-1" class="slot-panel">
+      <label class="vis-label"><input type="checkbox" id="slot-visible-1" checked onchange="toggleSlotVisible(1)"> 👁️ Slot B Surface Visible</label>
+      <div class="control-group" style="margin-top:10px;">
+        <div class="control-label">Load Media</div>
+        <input type="file" id="input-media-1" accept="image/*,video/*">
+        <div id="media-status-1" class="status-box">No media loaded.</div>
+      </div>
+      <div class="transport-row">
+        <button id="btn-play-1" onclick="toggleSlotPlayback(1)" disabled>▶ Play</button>
+        <input type="range" id="seek-1" min="0" max="1000" step="1" value="0" oninput="seekSlot(1, this.value)" disabled>
+      </div>
+      <div id="time-1" class="time-readout">00:00 / 00:00</div>
+      <label class="vis-label" style="margin-top:8px;"><input type="checkbox" id="loop-1" checked onchange="setSlotLoop(1, this.checked)"> Loop</label>
+      <div class="btn-group">
+        <button id="btn-webcam-1" onclick="toggleWebcamForSlot(1)">📷 Webcam</button>
+        <button onclick="clearSlotMedia(1)">Clear</button>
+      </div>
+    </div>
+
+    <div id="cam-selector-ui">
+      <div class="control-label">Select Video Source</div>
+      <select id="cam-device-select" onchange="changeWebcamSource()"></select>
+      <button style="width:100%; margin-top:6px;" onclick="closeCamSelector()">Close</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <h3>Material</h3>
+    <div class="control-group">
+      <div class="control-label">Emission / Gain</div>
+      <div class="slider-row">
+        <input type="range" id="mat-emissive-slider" min="0" max="10" step="0.1" value="1.0">
+        <input class="num-small" type="number" id="mat-emissive-num" min="0" max="10" step="0.1" value="1.0">
+      </div>
+    </div>
+    <div class="control-group">
+      <div class="control-label">Screen Tint</div>
+      <input type="color" id="mat-tint" value="#ffffff">
+    </div>
+
+    <div class="divider"></div>
+
+    <h3>Texture UV</h3>
+    <div class="control-group">
+      <div class="control-label">Offset U / V</div>
+      <div class="slider-row"><input type="range" id="uv-u-s" min="-1" max="1" step="0.01" value="0"><input class="num-small" type="number" id="uv-u-n" value="0" step="0.01"></div>
+      <div class="slider-row"><input type="range" id="uv-v-s" min="-1" max="1" step="0.01" value="0"><input class="num-small" type="number" id="uv-v-n" value="0" step="0.01"></div>
+    </div>
+    <div class="control-group">
+      <div class="control-label">Tiling U / V</div>
+      <div class="slider-row"><input type="range" id="uv-tu-s" min="0" max="3" step="0.01" value="1"><input class="num-small" type="number" id="uv-tu-n" value="1" step="0.01"></div>
+      <div class="slider-row"><input type="range" id="uv-tv-s" min="0" max="3" step="0.01" value="1"><input class="num-small" type="number" id="uv-tv-n" value="1" step="0.01"></div>
+    </div>
+    <div class="btn-group">
+      <button id="btn-flip-x">Flip X</button>
+      <button id="btn-flip-y">Flip Y</button>
+      <button id="btn-rot">Rot 90°</button>
+    </div>
+    <div class="btn-group">
+      <button id="btn-wrap">Wrap</button>
+      <button id="btn-reset-uv">Reset UV</button>
+    </div>
+  </div>
+
+  <div id="ui-right" class="panel">
+    <h3>Scene</h3>
+    <div class="tab-bar">
+      <button class="tab-btn active" id="scene-tab-front" onclick="switchSceneSide('front')">Front</button>
+      <button class="tab-btn" id="scene-tab-back" onclick="switchSceneSide('back')">Back</button>
+    </div>
+    <div class="status-box">
+      <strong>Fixed Bake Camera</strong><br>
+      Resolution: 4728 × 5760<br>
+      FOV: 10°<br>
+      Position: X 0 / Y 342.901569 / Z 0<br>
+      Rotation: X -90 / Y 0 / Z 0<br>
+      Background / Audio / Zoom / Lens Shift: removed
+    </div>
+
+    <div class="divider"></div>
+
+    <h3>PNG Export</h3>
+    <button id="btn-save-png" class="primary-green" style="width:100%;">📸 Save PNG 4728×5760</button>
+
+    <div class="divider"></div>
+
+    <h3>Video Export</h3>
+    <div class="control-group">
+      <div class="control-label">Format</div>
+      <select id="export-format">
+        <option value="webm" selected>WebM</option>
+        <option value="mp4">MP4 if supported</option>
+      </select>
+      <div id="encoder-status" class="hint">Checking MediaRecorder support...</div>
+    </div>
+    <div class="control-group">
+      <div class="control-label">FPS</div>
+      <select id="export-fps">
+        <option value="auto" selected>Auto from video / 30 fallback</option>
+        <option value="24">24</option>
+        <option value="25">25</option>
+        <option value="29.97">29.97</option>
+        <option value="30">30</option>
+        <option value="50">50</option>
+        <option value="59.94">59.94</option>
+        <option value="60">60</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <div class="control-label">Bitrate Mbps</div>
+      <input type="number" id="export-bitrate" min="2" max="160" step="1" value="40">
+    </div>
+    <div class="control-group">
+      <div class="control-label">Static Duration sec</div>
+      <input type="number" id="static-duration" min="1" max="60" step="1" value="5">
+      <div class="hint">동영상 소스가 없을 때만 사용됩니다.</div>
+    </div>
+    <button id="btn-export-video" class="primary-purple" style="width:100%;">🎬 Export Video 4728×5760</button>
+
+    <div class="divider"></div>
+
+    <h3>PNG Sequence Fallback</h3>
+    <div class="control-group">
+      <div class="control-label">Max Frames</div>
+      <input type="number" id="pngseq-max-frames" min="1" max="9999" step="1" value="120">
+      <div class="hint">4728×5760 PNG ZIP은 매우 무겁습니다. 테스트는 짧게 권장합니다.</div>
+    </div>
+    <button id="btn-export-pngseq" class="primary-blue" style="width:100%;">🧩 Export PNG Sequence ZIP</button>
+
+    <div id="export-status" class="status-box">Ready.</div>
+
+    <div class="divider"></div>
+    <div class="small" style="text-align:center;">
+      Signage Baker WebKit<br>
+      Baker.html / 4728×5760 / Auto GLB + Direct Folder Save
+    </div>
+  </div>
+
+  <video id="webcam-video" autoplay muted loop playsinline style="display:none;"></video>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+      "jszip": "https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import JSZip from 'jszip';
+
+    const TARGET_WIDTH = 4728;
+    const TARGET_HEIGHT = 5760;
+    const TARGET_ASPECT = TARGET_WIDTH / TARGET_HEIGHT;
+    const CAMERA_FOV = 10;
+    const SIGNAGE_HEIGHT_M = 60;
+    const CAMERA_Y = SIGNAGE_HEIGHT_M / (2 * Math.tan(THREE.MathUtils.degToRad(CAMERA_FOV / 2)));
+
+    const stage = document.getElementById('stage');
+    const container = document.getElementById('canvas-container');
+    const gltfLoader = new GLTFLoader();
+    const textureLoader = new THREE.TextureLoader();
+
+    // GitHub Pages deployment target:
+    // Repository root:
+    //   Baker.html
+    //   assets/Baker_75f_Front_v1.glb
+    //   assets/Baker_75f_Back_v1.glb
+    const ASSET_PATH = './assets/';
+    const AUTO_MODEL_FILES = {
+      front: 'Baker_75f_Front_v1.glb',
+      back: 'Baker_75f_Back_v1.glb'
+    };
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(1);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.autoClear = true;
+    container.appendChild(renderer.domElement);
+
+    const camera = new THREE.PerspectiveCamera(CAMERA_FOV, TARGET_ASPECT, 0.01, 10000);
+    camera.position.set(0, CAMERA_Y, 0);
+    camera.rotation.order = 'XYZ';
+    camera.rotation.set(THREE.MathUtils.degToRad(-90), 0, 0);
+    camera.updateProjectionMatrix();
+
+    const sides = {
+      front: createBakeSide('front'),
+      back: createBakeSide('back')
+    };
+
+    const slots = [createSlot(0, 'A'), createSlot(1, 'B')];
+
+    let activeSide = 'front';
+    let activeSlot = 0;
+    let isExporting = false;
+    let webcamTexture = null;
+    const webcamVideo = document.getElementById('webcam-video');
+
+    const inputSequence = {
+      files: [],
+      targetSlot: 0,
+      folderName: '',
+      totalBytes: 0
+    };
+
+    let outputDirectoryHandle = null;
+    let directSaveCancelRequested = false;
+
+    function createBakeSide(key) {
+      const scene = new THREE.Scene();
+      // No scene lights are required. Loaded GLB materials are converted to MeshBasicMaterial
+      // so the baker output does not change due to lighting, metalness, roughness, AO, or PBR shading.
+      return {
+        key,
+        scene,
+        root: null,
+        targets: [[], []],
+        loadedName: '',
+        autoUrl: ''
+      };
+    }
+
+    function createSlot(index, label) {
+      return {
+        index,
+        label,
+        media: {
+          kind: 'none',
+          texture: null,
+          videoElement: null,
+          url: null,
+          name: '',
+          fps: null
+        },
+        config: {
+          visible: true,
+          emissive: 1.0,
+          tint: '#ffffff',
+          offsetU: 0,
+          offsetV: 0,
+          tilingU: 1,
+          tilingV: 1,
+          flipX: false,
+          flipY: false,
+          rot: 0,
+          wrap: false,
+          loop: true
+        }
+      };
+    }
+
+    function showToast(message) {
+      const t = document.getElementById('toast');
+      t.innerText = message;
+      t.style.opacity = 1;
+      clearTimeout(showToast._timer);
+      showToast._timer = setTimeout(() => t.style.opacity = 0, 2600);
+    }
+
+    function setExportStatus(message) {
+      document.getElementById('export-status').innerHTML = message;
+    }
+
+    function resizeStage() {
+      if (isExporting) return;
+      const winW = window.innerWidth;
+      const winH = window.innerHeight;
+      let w, h;
+      if (winW / winH > TARGET_ASPECT) {
+        h = winH;
+        w = h * TARGET_ASPECT;
+      } else {
+        w = winW;
+        h = w / TARGET_ASPECT;
+      }
+      stage.style.width = `${w}px`;
+      stage.style.height = `${h}px`;
+      renderer.setPixelRatio(1);
+      renderer.setSize(w, h, false);
+      camera.aspect = TARGET_ASPECT;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', resizeStage);
+
+    function createUnlitMaterial(slot) {
+      const mat = new THREE.MeshBasicMaterial({
+        map: null,
+        color: new THREE.Color(1, 1, 1),
+        transparent: true,
+        opacity: 1,
+        side: THREE.DoubleSide,
+        depthTest: true,
+        depthWrite: true,
+        toneMapped: false
+      });
+      mat.userData.isBakerScreenMaterial = true;
+      mat.userData.slotIndex = slot.index;
+      return mat;
+    }
+
+    function copyTextureSamplingSettings(tex) {
+      if (!tex) return tex;
+      tex.colorSpace = tex.colorSpace || THREE.SRGBColorSpace;
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      tex.needsUpdate = true;
+      return tex;
+    }
+
+    function createUnlitCopyFromMaterial(sourceMaterial) {
+      const src = sourceMaterial || {};
+      const baseMap = src.map || src.emissiveMap || null;
+      if (baseMap) copyTextureSamplingSettings(baseMap);
+
+      const baseColor = new THREE.Color(1, 1, 1);
+      if (src.color && src.color.isColor) baseColor.copy(src.color);
+      else if (src.emissive && src.emissive.isColor) baseColor.copy(src.emissive);
+
+      const mat = new THREE.MeshBasicMaterial({
+        map: baseMap,
+        color: baseColor,
+        transparent: !!src.transparent || (Number.isFinite(src.opacity) && src.opacity < 1) || !!src.alphaMap,
+        opacity: Number.isFinite(src.opacity) ? src.opacity : 1,
+        alphaMap: src.alphaMap || null,
+        side: src.side ?? THREE.DoubleSide,
+        depthTest: src.depthTest ?? true,
+        depthWrite: src.depthWrite ?? true,
+        toneMapped: false
+      });
+      mat.name = `${src.name || 'material'}_Unlit`;
+      mat.userData.isBakerUnlitConverted = true;
+      return mat;
+    }
+
+    function disposeMaterialOnly(material) {
+      if (!material) return;
+      if (Array.isArray(material)) {
+        material.forEach(m => m?.dispose?.());
+      } else {
+        material.dispose?.();
+      }
+    }
+
+    function convertAllModelMaterialsToUnlit(root) {
+      if (!root) return;
+      root.traverse(obj => {
+        if (!obj.isMesh) return;
+        const oldMaterial = obj.material;
+        if (Array.isArray(oldMaterial)) {
+          obj.material = oldMaterial.map(m => createUnlitCopyFromMaterial(m));
+        } else {
+          obj.material = createUnlitCopyFromMaterial(oldMaterial);
+        }
+        disposeMaterialOnly(oldMaterial);
+        obj.castShadow = false;
+        obj.receiveShadow = false;
+      });
+    }
+
+    function updateMaterialGain(mat, slot) {
+      const tint = new THREE.Color(slot.config.tint || '#ffffff');
+      const gain = Math.max(0, parseFloat(slot.config.emissive) || 0);
+      mat.color.setRGB(tint.r * gain, tint.g * gain, tint.b * gain);
+      mat.needsUpdate = true;
+    }
+
+    function disposeObject3D(root) {
+      if (!root) return;
+      root.traverse(obj => {
+        if (obj.isMesh) {
+          if (obj.geometry) obj.geometry.dispose?.();
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          mats.filter(Boolean).forEach(m => m.dispose?.());
+        }
+      });
+    }
+
+    function scoreMeshNameForSlot(meshName, slotIdx) {
+      const name = (meshName || '').toLowerCase();
+
+      // IMPORTANT:
+      // Do not use loose tokens like `_a` / `_b` here.
+      // A back-side GLB often contains names such as `Baker_75f_Back`, and `_b` inside `_back`
+      // would incorrectly classify the only screen surface as Slot B.
+      const aKeys = ['luux', 'slot_a', 'slot-a', 'slot a', 'screen_a', 'screen-a', 'screen a', 'display_a', 'display-a', 'display a', 'model_a', 'model-a', 'model a'];
+      const bKeys = ['ilmin', 'slot_b', 'slot-b', 'slot b', 'screen_b', 'screen-b', 'screen b', 'display_b', 'display-b', 'display b', 'model_b', 'model-b', 'model b'];
+      const generic = ['screen', 'display', 'led', 'signage', 'panel', 'baker'];
+      const keys = slotIdx === 0 ? aKeys : bKeys;
+
+      if (keys.some(k => name.includes(k))) return 10;
+      if (generic.some(k => name.includes(k))) return 4;
+      return 0;
+    }
+
+    function collectTargetCandidateMeshes(root) {
+      const meshes = [];
+      root.traverse(child => { if (child.isMesh) meshes.push(child); });
+      return meshes;
+    }
+
+    function assignTargetsForSide(side) {
+      side.targets = [[], []];
+      if (!side.root) return;
+
+      const meshes = collectTargetCandidateMeshes(side.root);
+      const genericTargets = [];
+
+      for (const mesh of meshes) {
+        const aScore = scoreMeshNameForSlot(mesh.name, 0);
+        const bScore = scoreMeshNameForSlot(mesh.name, 1);
+
+        if (aScore >= 10 && aScore >= bScore) {
+          side.targets[0].push(mesh);
+        } else if (bScore >= 10 && bScore > aScore) {
+          side.targets[1].push(mesh);
+        } else if (aScore >= 4 || bScore >= 4) {
+          genericTargets.push(mesh);
+        }
+      }
+
+      // Single-surface baker GLBs should default to Slot A.
+      // Front/Back are scene sides, not media slots.
+      if (side.targets[0].length === 0 && side.targets[1].length === 0) {
+        if (genericTargets.length > 0) {
+          side.targets[0].push(...genericTargets);
+        } else if (meshes.length > 0) {
+          side.targets[0].push(meshes[0]);
+          showToast(`${side.key}: target mesh name not found. First mesh assigned to Slot A.`);
+        }
+      }
+
+      // If only Slot B was detected but the scene has a single target, treat it as Slot A.
+      // This prevents `Back` names from turning the surface into an empty Slot B target.
+      if (side.targets[0].length === 0 && side.targets[1].length === 1 && meshes.length === 1) {
+        side.targets[0].push(side.targets[1][0]);
+        side.targets[1] = [];
+      }
+
+      const targetSet = new Set([...side.targets[0], ...side.targets[1]]);
+
+      for (const mesh of meshes) {
+        if (!targetSet.has(mesh)) continue;
+        const slotIndex = side.targets[1].includes(mesh) ? 1 : 0;
+        const old = mesh.material;
+        disposeMaterialOnly(old);
+        mesh.material = createUnlitMaterial(slots[slotIndex]);
+      }
+
+      updateSlotMaterial(0);
+      updateSlotMaterial(1);
+      updateModelStatus(side.key);
+    }
+
+    function updateModelStatus(sideKey) {
+      const side = sides[sideKey];
+      const el = document.getElementById(`model-status-${sideKey}`);
+      const aCount = side.targets[0].length;
+      const bCount = side.targets[1].length;
+      if (!side.root) {
+        el.innerHTML = `${sideKey} model not loaded.`;
+        return;
+      }
+      el.innerHTML = `<strong>${side.loadedName}</strong><br>Slot A targets: ${aCount}<br>Slot B targets: ${bCount}<br>${aCount || bCount ? '<span class="status-ok">Ready</span>' : '<span class="status-warn">No target mesh</span>'}`;
+    }
+
+    function setSideRoot(sideKey, root, displayName, sourceUrl = '') {
+      const side = sides[sideKey];
+      if (side.root) {
+        side.scene.remove(side.root);
+        disposeObject3D(side.root);
+      }
+      side.root = root;
+      side.loadedName = displayName;
+      side.autoUrl = sourceUrl;
+      side.scene.add(side.root);
+
+      // Convert the whole loaded model to Unlit first. Target screen surfaces are then
+      // replaced with baker materials that receive the current media texture.
+      convertAllModelMaterialsToUnlit(side.root);
+      assignTargetsForSide(side);
+    }
+
+    function loadModelFromUrl(sideKey, url, displayName) {
+      const el = document.getElementById(`model-status-${sideKey}`);
+      if (el) el.innerHTML = `Loading: <strong>${displayName}</strong>`;
+      gltfLoader.load(url, gltf => {
+        setSideRoot(sideKey, gltf.scene, displayName, url);
+        showToast(`${sideKey.toUpperCase()} GLB auto-loaded`);
+      }, undefined, err => {
+        console.warn(`${sideKey} auto GLB load failed:`, err);
+        if (el) el.innerHTML = `<span class="status-warn">Auto load failed</span><br>${displayName}<br>수동 업로드를 사용하세요.`;
+        showToast(`${sideKey.toUpperCase()} auto-load failed`);
+      });
+    }
+
+    function loadModelToSide(sideKey, file) {
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      gltfLoader.load(url, gltf => {
+        setSideRoot(sideKey, gltf.scene, file.name, 'manual');
+        URL.revokeObjectURL(url);
+        showToast(`${sideKey.toUpperCase()} GLB manually loaded`);
+      }, undefined, err => {
+        URL.revokeObjectURL(url);
+        console.error(err);
+        showToast(`${sideKey} GLB load failed`);
+      });
+    }
+
+    function autoLoadGitHubAssets() {
+      loadModelFromUrl('front', ASSET_PATH + AUTO_MODEL_FILES.front, AUTO_MODEL_FILES.front);
+      loadModelFromUrl('back', ASSET_PATH + AUTO_MODEL_FILES.back, AUTO_MODEL_FILES.back);
+    }
+
+    function activeSideTargetCount(slotIdx) {
+      return sides[activeSide]?.targets?.[slotIdx]?.length || 0;
+    }
+
+    function warnIfNoTargetForActiveSide(slotIdx) {
+      if (slots[slotIdx].media.texture && activeSideTargetCount(slotIdx) === 0) {
+        showToast(`Slot ${slots[slotIdx].label} has media, but current ${activeSide.toUpperCase()} scene has no target for this slot.`);
+      }
+    }
+
+    function updateSlotMaterial(slotIdx) {
+      const slot = slots[slotIdx];
+      const tex = slot.media.texture;
+
+      for (const side of Object.values(sides)) {
+        for (const mesh of side.targets[slotIdx]) {
+          if (!mesh.material || !mesh.material.userData?.isBakerScreenMaterial) {
+            mesh.material = createUnlitMaterial(slot);
+          }
+          const mat = mesh.material;
+          if (tex) {
+            tex.flipY = false;
+            tex.center.set(0.5, 0.5);
+            tex.rotation = slot.config.rot * Math.PI / 2;
+            tex.offset.set(slot.config.offsetU, slot.config.offsetV);
+            tex.repeat.set(
+              slot.config.tilingU * (slot.config.flipX ? -1 : 1),
+              slot.config.tilingV * (slot.config.flipY ? -1 : 1)
+            );
+            tex.wrapS = tex.wrapT = slot.config.wrap ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
+            tex.needsUpdate = true;
+            mat.map = tex;
+          } else {
+            mat.map = null;
+          }
+          updateMaterialGain(mat, slot);
+          // A slot with no media should not render as a white card.
+          // It remains hidden until an image/video/webcam texture is assigned.
+          mesh.visible = slot.config.visible && !!tex;
+          mat.needsUpdate = true;
+        }
+      }
+    }
+
+    function clearSlotMediaInternal(slotIdx) {
+      const slot = slots[slotIdx];
+      const media = slot.media;
+      if (media.kind === 'webcam') {
+        // Do not stop global webcam here; another slot may still use it.
+      }
+      if (media.videoElement && media.kind === 'video') {
+        media.videoElement.pause();
+        media.videoElement.removeAttribute('src');
+        media.videoElement.load();
+      }
+      if (media.texture && media.kind !== 'webcam') media.texture.dispose?.();
+      if (media.url) URL.revokeObjectURL(media.url);
+      slot.media = { kind: 'none', texture: null, videoElement: null, url: null, name: '', fps: null };
+      document.getElementById(`drop-media-${slotIdx}`).classList.remove('has-file');
+      document.getElementById(`btn-webcam-${slotIdx}`).classList.remove('active-btn');
+      updateSlotMaterial(slotIdx);
+      updateMediaStatus(slotIdx);
+      updateWebcamLifeCycle();
+    }
+
+    window.clearSlotMedia = (slotIdx) => {
+      clearSlotMediaInternal(slotIdx);
+      showToast(`Slot ${slots[slotIdx].label} media cleared`);
+    };
+
+    function loadImageToSlot(slotIdx, file) {
+      clearSlotMediaInternal(slotIdx);
+      const slot = slots[slotIdx];
+      const url = URL.createObjectURL(file);
+      slot.media.kind = 'image';
+      slot.media.url = url;
+      slot.media.name = file.name;
+      textureLoader.load(url, tex => {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.flipY = false;
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        slot.media.texture = tex;
+        updateSlotMaterial(slotIdx);
+        updateMediaStatus(slotIdx);
+        warnIfNoTargetForActiveSide(slotIdx);
+        document.getElementById(`drop-media-${slotIdx}`).classList.add('has-file');
+        showToast(`Slot ${slot.label} image loaded`);
+      }, undefined, err => {
+        console.error(err);
+        showToast('Image load failed');
+      });
+    }
+
+    function loadVideoToSlot(slotIdx, file) {
+      clearSlotMediaInternal(slotIdx);
+      const slot = slots[slotIdx];
+      const url = URL.createObjectURL(file);
+      const video = document.createElement('video');
+      video.src = url;
+      video.muted = true;
+      video.loop = slot.config.loop;
+      video.playsInline = true;
+      video.preload = 'auto';
+      video.crossOrigin = 'anonymous';
+
+      slot.media.kind = 'video';
+      slot.media.url = url;
+      slot.media.name = file.name;
+      slot.media.videoElement = video;
+
+      video.addEventListener('loadedmetadata', () => {
+        const tex = new THREE.VideoTexture(video);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.flipY = false;
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        slot.media.texture = tex;
+        updateSlotMaterial(slotIdx);
+        updateMediaStatus(slotIdx);
+        warnIfNoTargetForActiveSide(slotIdx);
+        estimateVideoFPS(video, 50, 2500).then(fps => {
+          if (fps) {
+            slot.media.fps = fps;
+            updateMediaStatus(slotIdx);
+          }
+        });
+      }, { once: true });
+
+      video.addEventListener('canplay', async () => {
+        try { await video.play(); } catch (err) { console.warn('Autoplay blocked:', err); }
+        updateMediaStatus(slotIdx);
+      }, { once: true });
+
+      video.addEventListener('timeupdate', () => updateTransportUI(slotIdx));
+      video.addEventListener('play', () => updateTransportUI(slotIdx));
+      video.addEventListener('pause', () => updateTransportUI(slotIdx));
+      video.addEventListener('error', () => showToast('Video load failed. Use browser-supported MP4/WebM.'));
+
+      document.getElementById(`drop-media-${slotIdx}`).classList.add('has-file');
+      updateMediaStatus(slotIdx);
+      video.load();
+      showToast(`Slot ${slot.label} video loaded`);
+    }
+
+    function loadMediaToSlot(slotIdx, file) {
+      if (!file) return;
+      const name = file.name.toLowerCase();
+      if (file.type.startsWith('image/') || name.match(/\.(jpg|jpeg|png|webp)$/)) loadImageToSlot(slotIdx, file);
+      else if (file.type.startsWith('video/') || name.match(/\.(mp4|mov|webm|m4v)$/)) loadVideoToSlot(slotIdx, file);
+      else showToast('Unsupported media format');
+    }
+
+    function formatTime(seconds) {
+      if (!Number.isFinite(seconds) || seconds < 0) return '00:00';
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      const cs = Math.floor((seconds % 1) * 100);
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
+    }
+
+    function updateTransportUI(slotIdx) {
+      const slot = slots[slotIdx];
+      const media = slot.media;
+      const playBtn = document.getElementById(`btn-play-${slotIdx}`);
+      const seek = document.getElementById(`seek-${slotIdx}`);
+      const time = document.getElementById(`time-${slotIdx}`);
+      if (media.kind !== 'video' || !media.videoElement) {
+        playBtn.disabled = true;
+        playBtn.innerText = '▶ Play';
+        seek.disabled = true;
+        seek.value = 0;
+        time.innerText = '00:00 / 00:00';
+        return;
+      }
+      const v = media.videoElement;
+      playBtn.disabled = false;
+      seek.disabled = false;
+      playBtn.innerText = v.paused ? '▶ Play' : '⏸ Pause';
+      if (Number.isFinite(v.duration) && v.duration > 0) {
+        seek.value = Math.round((v.currentTime / v.duration) * 1000);
+        time.innerText = `${formatTime(v.currentTime)} / ${formatTime(v.duration)}`;
+      } else {
+        seek.value = 0;
+        time.innerText = '00:00 / 00:00';
+      }
+    }
+
+    function updateMediaStatus(slotIdx) {
+      const slot = slots[slotIdx];
+      const el = document.getElementById(`media-status-${slotIdx}`);
+      const m = slot.media;
+      if (m.kind === 'image') {
+        el.innerHTML = `<strong>Image</strong><br>${m.name}`;
+      } else if (m.kind === 'video') {
+        const v = m.videoElement;
+        const dur = Number.isFinite(v?.duration) ? `${v.duration.toFixed(2)} sec` : 'duration pending';
+        const fps = m.fps ? `${m.fps} fps` : 'FPS pending / Auto';
+        el.innerHTML = `<strong>Video</strong><br>${m.name}<br>${v?.videoWidth || '?'} × ${v?.videoHeight || '?'} / ${dur}<br>${fps}`;
+      } else if (m.kind === 'webcam') {
+        el.innerHTML = `<strong>Webcam</strong><br>Live camera source`;
+      } else if (m.kind === 'sequence-frame') {
+        el.innerHTML = `<strong>Sequence Frame</strong><br>${m.name || 'current frame'}`;
+      } else {
+        el.innerHTML = 'No media loaded.';
+      }
+      updateTransportUI(slotIdx);
+    }
+
+    window.toggleSlotPlayback = async (slotIdx) => {
+      const v = slots[slotIdx].media.videoElement;
+      if (!v) return;
+      try {
+        if (v.paused) await v.play();
+        else v.pause();
+      } catch (err) {
+        console.warn(err);
+        showToast('Playback blocked. Click the page and retry.');
+      }
+      updateTransportUI(slotIdx);
+    };
+
+    window.seekSlot = (slotIdx, value) => {
+      const v = slots[slotIdx].media.videoElement;
+      if (!v || !Number.isFinite(v.duration) || v.duration <= 0) return;
+      v.currentTime = (parseFloat(value) / 1000) * v.duration;
+      updateTransportUI(slotIdx);
+    };
+
+    window.setSlotLoop = (slotIdx, checked) => {
+      const slot = slots[slotIdx];
+      slot.config.loop = !!checked;
+      if (slot.media.videoElement) slot.media.videoElement.loop = slot.config.loop;
+    };
+
+    async function ensureWebcam() {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('getUserMedia not supported');
+      if (!webcamTexture) {
+        webcamTexture = new THREE.VideoTexture(webcamVideo);
+        webcamTexture.colorSpace = THREE.SRGBColorSpace;
+        webcamTexture.minFilter = THREE.LinearFilter;
+        webcamTexture.magFilter = THREE.LinearFilter;
+        webcamTexture.flipY = false;
+      }
+      if (!webcamVideo.srcObject) {
+        const devicesGranted = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        devicesGranted.getTracks().forEach(t => t.stop());
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        document.getElementById('cam-device-select').innerHTML = devices
+          .filter(d => d.kind === 'videoinput')
+          .map(d => `<option value="${d.deviceId}">${d.label || 'Camera ' + d.deviceId}</option>`)
+          .join('');
+        await changeWebcamSource();
+      }
+      document.getElementById('cam-selector-ui').style.display = 'block';
+    }
+
+    window.toggleWebcamForSlot = async (slotIdx) => {
+      const slot = slots[slotIdx];
+      if (slot.media.kind === 'webcam') {
+        clearSlotMediaInternal(slotIdx);
+        return;
+      }
+      try {
+        clearSlotMediaInternal(slotIdx);
+        await ensureWebcam();
+        slot.media.kind = 'webcam';
+        slot.media.texture = webcamTexture;
+        slot.media.videoElement = webcamVideo;
+        slot.media.name = 'Webcam';
+        document.getElementById(`btn-webcam-${slotIdx}`).classList.add('active-btn');
+        document.getElementById(`drop-media-${slotIdx}`).classList.add('has-file');
+        updateSlotMaterial(slotIdx);
+        updateMediaStatus(slotIdx);
+        showToast(`Slot ${slot.label}: webcam source`);
+      } catch (err) {
+        console.error(err);
+        showToast('Camera access failed or denied.');
+      }
+    };
+
+    window.changeWebcamSource = async () => {
+      const deviceId = document.getElementById('cam-device-select').value;
+      if (webcamVideo.srcObject) {
+        webcamVideo.srcObject.getTracks().forEach(t => t.stop());
+        webcamVideo.srcObject = null;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: deviceId ? { deviceId: { exact: deviceId } } : true,
+        audio: false
+      });
+      webcamVideo.srcObject = stream;
+      await webcamVideo.play();
+      for (let i = 0; i < 2; i++) {
+        if (slots[i].media.kind === 'webcam') updateSlotMaterial(i);
+      }
+    };
+
+    window.closeCamSelector = () => {
+      document.getElementById('cam-selector-ui').style.display = 'none';
+    };
+
+    function updateWebcamLifeCycle() {
+      const inUse = slots.some(s => s.media.kind === 'webcam');
+      if (!inUse && webcamVideo.srcObject) {
+        webcamVideo.srcObject.getTracks().forEach(t => t.stop());
+        webcamVideo.srcObject = null;
+      }
+    }
+
+    window.switchSlot = (slotIdx) => {
+      activeSlot = slotIdx;
+      document.getElementById('slot-tab-0').classList.toggle('active', slotIdx === 0);
+      document.getElementById('slot-tab-1').classList.toggle('active', slotIdx === 1);
+      document.getElementById('slot-panel-0').classList.toggle('active', slotIdx === 0);
+      document.getElementById('slot-panel-1').classList.toggle('active', slotIdx === 1);
+      syncSlotUI();
+    };
+
+    window.toggleSlotVisible = (slotIdx) => {
+      slots[slotIdx].config.visible = document.getElementById(`slot-visible-${slotIdx}`).checked;
+      updateSlotMaterial(slotIdx);
+    };
+
+    function syncSlotUI() {
+      const cfg = slots[activeSlot].config;
+      const setPair = (base, val) => {
+        document.getElementById(`${base}-s`).value = val;
+        document.getElementById(`${base}-n`).value = val;
+      };
+      setPair('uv-u', cfg.offsetU);
+      setPair('uv-v', cfg.offsetV);
+      setPair('uv-tu', cfg.tilingU);
+      setPair('uv-tv', cfg.tilingV);
+      document.getElementById('mat-emissive-slider').value = cfg.emissive;
+      document.getElementById('mat-emissive-num').value = cfg.emissive;
+      document.getElementById('mat-tint').value = cfg.tint;
+    }
+
+    window.switchSceneSide = (sideKey) => {
+      activeSide = sideKey;
+      document.getElementById('scene-tab-front').classList.toggle('active', sideKey === 'front');
+      document.getElementById('scene-tab-back').classList.toggle('active', sideKey === 'back');
+      showToast(`Scene: ${sideKey}`);
+    };
+
+
+    function isSupportedSequenceImageFile(file) {
+      if (!file) return false;
+      const name = (file.name || '').toLowerCase();
+      return file.type === 'image/png' || file.type === 'image/jpeg' || name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg');
+    }
+
+    function getSequenceFileLabel(file) {
+      return file.webkitRelativePath || file.name || 'frame';
+    }
+
+    function sortSequenceFiles(files) {
+      return files
+        .filter(isSupportedSequenceImageFile)
+        .sort((a, b) => getSequenceFileLabel(a).localeCompare(getSequenceFileLabel(b), undefined, { numeric: true, sensitivity: 'base' }));
+    }
+
+    function inferSequenceFolderName(files) {
+      const first = files[0];
+      if (!first) return '';
+      const rel = first.webkitRelativePath || '';
+      if (!rel.includes('/')) return '';
+      return rel.split('/')[0];
+    }
+
+    function updateSequenceStatus() {
+      const el = document.getElementById('sequence-status');
+      if (!el) return;
+      const slotLabel = slots[inputSequence.targetSlot]?.label || 'A';
+      if (!inputSequence.files.length) {
+        el.innerHTML = 'No image sequence loaded.';
+        return;
+      }
+      const first = getSequenceFileLabel(inputSequence.files[0]);
+      const last = getSequenceFileLabel(inputSequence.files[inputSequence.files.length - 1]);
+      const mb = inputSequence.totalBytes / 1024 / 1024;
+      const startInput = document.getElementById('seq-start-frame');
+      const endInput = document.getElementById('seq-end-frame');
+      const startFrame = Math.max(1, Math.min(parseInt(startInput?.value || '1', 10) || 1, inputSequence.files.length));
+      const endFrame = Math.max(startFrame, Math.min(parseInt(endInput?.value || String(inputSequence.files.length), 10) || inputSequence.files.length, inputSequence.files.length));
+      const selectedCount = Math.max(0, endFrame - startFrame + 1);
+      el.innerHTML = `<strong>${inputSequence.folderName || 'Selected folder'}</strong><br>` +
+        `Target: Slot ${slotLabel}<br>` +
+        `Frames: ${inputSequence.files.length}<br>` +
+        `Selected: ${startFrame} to ${endFrame} (${selectedCount})<br>` +
+        `Size: ${mb.toFixed(2)} MB<br>` +
+        `First: ${first}<br>` +
+        `Last: ${last}`;
+    }
+
+    function handleSequenceFiles(files) {
+      const sorted = sortSequenceFiles(files);
+      inputSequence.files = sorted;
+      inputSequence.folderName = inferSequenceFolderName(sorted);
+      inputSequence.totalBytes = sorted.reduce((sum, f) => sum + (f.size || 0), 0);
+      const startInput = document.getElementById('seq-start-frame');
+      const endInput = document.getElementById('seq-end-frame');
+      if (startInput) startInput.value = sorted.length ? 1 : 1;
+      if (endInput) endInput.value = sorted.length ? sorted.length : 1;
+      updateSequenceStatus();
+      if (!sorted.length) {
+        showToast('No PNG/JPG sequence files found');
+      } else {
+        showToast(`Image sequence loaded: ${sorted.length} frames`);
+      }
+    }
+
+    function clearInputSequence() {
+      inputSequence.files = [];
+      inputSequence.folderName = '';
+      inputSequence.totalBytes = 0;
+      const input = document.getElementById('input-sequence-folder');
+      if (input) input.value = '';
+      const startInput = document.getElementById('seq-start-frame');
+      const endInput = document.getElementById('seq-end-frame');
+      if (startInput) startInput.value = 1;
+      if (endInput) endInput.value = 1;
+      updateSequenceStatus();
+      showToast('Image sequence cleared');
+    }
+
+    async function previewFirstSequenceFrame() {
+      if (!inputSequence.files.length) {
+        showToast('Load an image sequence folder first');
+        return;
+      }
+      const slotIdx = inputSequence.targetSlot;
+      const startInput = document.getElementById('seq-start-frame');
+      const startFrame = Math.max(1, Math.min(parseInt(startInput?.value || '1', 10) || 1, inputSequence.files.length));
+      const previewFile = inputSequence.files[startFrame - 1] || inputSequence.files[0];
+      // Preview is intentionally loaded as normal still media.
+      // It lets the user verify UV / target mesh before running a batch bake.
+      loadImageToSlot(slotIdx, previewFile);
+      switchSlot(slotIdx);
+      showToast(`Preview start frame on Slot ${slots[slotIdx].label}`);
+    }
+
+    function snapshotSlotMedia(slotIdx) {
+      const media = slots[slotIdx].media;
+      return {
+        kind: media.kind,
+        texture: media.texture,
+        videoElement: media.videoElement,
+        url: media.url,
+        name: media.name,
+        fps: media.fps
+      };
+    }
+
+    function restoreSlotMedia(slotIdx, snapshot) {
+      slots[slotIdx].media = snapshot;
+      updateSlotMaterial(slotIdx);
+      updateMediaStatus(slotIdx);
+    }
+
+    function loadSequenceTexture(file) {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        textureLoader.load(url, tex => {
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.flipY = false;
+          tex.minFilter = THREE.LinearFilter;
+          tex.magFilter = THREE.LinearFilter;
+          resolve({ texture: tex, url });
+        }, undefined, err => {
+          URL.revokeObjectURL(url);
+          reject(err);
+        });
+      });
+    }
+
+    function disposeSequenceTexture(texObj) {
+      if (!texObj) return;
+      texObj.texture?.dispose?.();
+      if (texObj.url) URL.revokeObjectURL(texObj.url);
+    }
+
+    function makeSafeFrameName(file, index) {
+      const raw = (file.name || `frame_${String(index).padStart(5, '0')}.png`).replace(/\.(png|jpg|jpeg)$/i, '');
+      const safe = raw.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 120) || `frame_${String(index).padStart(5, '0')}`;
+      return `Baking_${safe}.png`;
+    }
+
+    function getSelectedSequenceRange() {
+      const total = inputSequence.files.length;
+      const startInput = document.getElementById('seq-start-frame');
+      const endInput = document.getElementById('seq-end-frame');
+      const startFrame = Math.max(1, Math.min(parseInt(startInput?.value || '1', 10) || 1, total));
+      const endFrame = Math.max(startFrame, Math.min(parseInt(endInput?.value || String(total), 10) || total, total));
+      return {
+        startFrame,
+        endFrame,
+        frames: inputSequence.files.slice(startFrame - 1, endFrame)
+      };
+    }
+
+    function updateDirectSaveStatus(message) {
+      const el = document.getElementById('direct-save-status');
+      if (el) el.innerHTML = message;
+    }
+
+    async function selectOutputFolder() {
+      if (!('showDirectoryPicker' in window)) {
+        updateDirectSaveStatus('이 브라우저는 direct folder save를 지원하지 않습니다.<br>Chrome 또는 Edge에서 localhost/HTTPS로 실행하세요.');
+        showToast('showDirectoryPicker unsupported');
+        return;
+      }
+      try {
+        outputDirectoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        const name = outputDirectoryHandle.name || 'Selected folder';
+        updateDirectSaveStatus(`<strong>${name}</strong><br>Output folder selected. Direct save ready.`);
+        showToast('Output folder selected');
+      } catch (err) {
+        if (err?.name !== 'AbortError') console.warn(err);
+        updateDirectSaveStatus('Output folder not selected.');
+      }
+    }
+
+    async function writeBlobToDirectory(dirHandle, fileName, blob) {
+      const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
+      const writable = await fileHandle.createWritable();
+      try {
+        await writable.write(blob);
+      } finally {
+        await writable.close();
+      }
+    }
+
+    async function exportLoadedImageSequenceDirect() {
+      if (isExporting) return;
+      if (!inputSequence.files.length) {
+        showToast('Load a PNG/JPG sequence folder first');
+        return;
+      }
+      if (!outputDirectoryHandle) {
+        await selectOutputFolder();
+        if (!outputDirectoryHandle) return;
+      }
+
+      const btn = document.getElementById('btn-save-seq-direct');
+      const stopBtn = document.getElementById('btn-stop-direct-save');
+      const slotIdx = inputSequence.targetSlot;
+      const oldMedia = snapshotSlotMedia(slotIdx);
+      const oldSize = new THREE.Vector2();
+      renderer.getSize(oldSize);
+      const oldPixelRatio = renderer.getPixelRatio();
+      const videos = getLoadedVideoElements();
+      const videoStates = capturePlaybackStates(videos);
+
+      try {
+        isExporting = true;
+        directSaveCancelRequested = false;
+        btn.disabled = true;
+        stopBtn.disabled = false;
+        btn.innerText = '⏳ Direct Saving...';
+
+        const { startFrame, endFrame, frames } = getSelectedSequenceRange();
+        for (const v of videos) v.pause();
+        renderer.setPixelRatio(1);
+        renderer.setSize(TARGET_WIDTH, TARGET_HEIGHT, false);
+        camera.aspect = TARGET_ASPECT;
+        camera.updateProjectionMatrix();
+
+        for (let i = 0; i < frames.length; i++) {
+          if (directSaveCancelRequested) {
+            setExportStatus(`Direct save stopped.<br>${i} / ${frames.length} frames saved.`);
+            showToast('Direct save stopped');
+            break;
+          }
+
+          const file = frames[i];
+          let texObj = null;
+          try {
+            texObj = await loadSequenceTexture(file);
+            slots[slotIdx].media = {
+              kind: 'sequence-frame',
+              texture: texObj.texture,
+              videoElement: null,
+              url: null,
+              name: file.name,
+              fps: null
+            };
+            updateSlotMaterial(slotIdx);
+            await nextFrame();
+            const blob = await renderCurrentFrameToPNGBlob();
+            const outName = makeSafeFrameName(file, i);
+            await writeBlobToDirectory(outputDirectoryHandle, outName, blob);
+
+            const pct = ((i + 1) / frames.length * 100).toFixed(1);
+            setExportStatus(`Direct saving... <strong>${pct}%</strong><br>${i + 1} / ${frames.length} frames (source ${startFrame + i})<br>${outName}`);
+            updateDirectSaveStatus(`<strong>${outputDirectoryHandle.name || 'Selected folder'}</strong><br>Saving: ${i + 1} / ${frames.length}<br>${outName}`);
+          } finally {
+            disposeSequenceTexture(texObj);
+          }
+        }
+
+        if (!directSaveCancelRequested) {
+          setExportStatus(`Direct save done.<br><strong>${frames.length}</strong> frames (${startFrame} to ${endFrame}) saved.`);
+          updateDirectSaveStatus(`<strong>${outputDirectoryHandle.name || 'Selected folder'}</strong><br>Direct save complete.<br>${frames.length} frames saved.`);
+          showToast('Direct image sequence save complete');
+        }
+      } catch (err) {
+        console.error(err);
+        setExportStatus(`Direct save failed.<br>${err.message || err}`);
+        updateDirectSaveStatus(`Direct save failed.<br>${err.message || err}`);
+        showToast('Direct image sequence save failed');
+      } finally {
+        await restorePlaybackStates(videoStates);
+        restoreSlotMedia(slotIdx, oldMedia);
+        renderer.setPixelRatio(oldPixelRatio);
+        renderer.setSize(oldSize.x, oldSize.y, false);
+        camera.aspect = TARGET_ASPECT;
+        camera.updateProjectionMatrix();
+        isExporting = false;
+        directSaveCancelRequested = false;
+        btn.disabled = false;
+        stopBtn.disabled = true;
+        btn.innerText = '💾 Save Range Direct';
+        resizeStage();
+      }
+    }
+
+    function stopDirectSave() {
+      directSaveCancelRequested = true;
+      showToast('Stop requested');
+    }
+
+    async function exportLoadedImageSequenceZip() {
+      if (isExporting) return;
+      if (!inputSequence.files.length) {
+        showToast('Load a PNG/JPG sequence folder first');
+        return;
+      }
+
+      const btn = document.getElementById('btn-export-input-seq');
+      const slotIdx = inputSequence.targetSlot;
+      const oldMedia = snapshotSlotMedia(slotIdx);
+      const oldSize = new THREE.Vector2();
+      renderer.getSize(oldSize);
+      const oldPixelRatio = renderer.getPixelRatio();
+      const videos = getLoadedVideoElements();
+      const videoStates = capturePlaybackStates(videos);
+
+      try {
+        isExporting = true;
+        btn.disabled = true;
+        btn.innerText = '⏳ Sequence Baking...';
+
+        const { startFrame, endFrame, frames } = getSelectedSequenceRange();
+        const zip = new JSZip();
+        const folderName = `Signage_${activeSide}_InputSeq_4728x5760`;
+        const folder = zip.folder(folderName);
+
+        for (const v of videos) v.pause();
+        renderer.setPixelRatio(1);
+        renderer.setSize(TARGET_WIDTH, TARGET_HEIGHT, false);
+        camera.aspect = TARGET_ASPECT;
+        camera.updateProjectionMatrix();
+
+        for (let i = 0; i < frames.length; i++) {
+          const file = frames[i];
+          let texObj = null;
+          try {
+            texObj = await loadSequenceTexture(file);
+            slots[slotIdx].media = {
+              kind: 'sequence-frame',
+              texture: texObj.texture,
+              videoElement: null,
+              url: null,
+              name: file.name,
+              fps: null
+            };
+            updateSlotMaterial(slotIdx);
+            await nextFrame();
+            const blob = await renderCurrentFrameToPNGBlob();
+            folder.file(makeSafeFrameName(file, i), blob);
+            const pct = ((i + 1) / frames.length * 100).toFixed(1);
+            setExportStatus(`Input sequence baking... <strong>${pct}%</strong><br>${i + 1} / ${frames.length} frames (source ${startFrame + i})<br>${getSequenceFileLabel(file)}`);
+          } finally {
+            disposeSequenceTexture(texObj);
+          }
+        }
+
+        restoreSlotMedia(slotIdx, oldMedia);
+        setExportStatus('Compressing input sequence ZIP...');
+        const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' }, meta => {
+          setExportStatus(`Compressing input sequence ZIP... <strong>${meta.percent.toFixed(1)}%</strong>`);
+        });
+        const url = URL.createObjectURL(zipBlob);
+        const link = document.createElement('a');
+        const srcName = (inputSequence.folderName || 'ImageSequence').replace(/[^a-zA-Z0-9._-]+/g, '_');
+        link.download = `Signage_${activeSide}_${srcName}_Baked_4728x5760_${Date.now()}.zip`;
+        link.href = url;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        setExportStatus(`Input sequence bake done.<br><strong>${frames.length}</strong> frames (${startFrame} to ${endFrame}) / ${(zipBlob.size / 1024 / 1024).toFixed(2)} MB`);
+        showToast('Input image sequence ZIP saved');
+      } catch (err) {
+        console.error(err);
+        setExportStatus(`Input sequence bake failed.<br>${err.message || err}`);
+        showToast('Input image sequence bake failed');
+        restoreSlotMedia(slotIdx, oldMedia);
+      } finally {
+        await restorePlaybackStates(videoStates);
+        restoreSlotMedia(slotIdx, oldMedia);
+        renderer.setPixelRatio(oldPixelRatio);
+        renderer.setSize(oldSize.x, oldSize.y, false);
+        camera.aspect = TARGET_ASPECT;
+        camera.updateProjectionMatrix();
+        isExporting = false;
+        btn.disabled = false;
+        btn.innerText = '🧩 Bake Loaded Image Sequence ZIP';
+        resizeStage();
+      }
+    }
+
+    function attachUIEvents() {
+      document.getElementById('input-glb-front').onchange = e => {
+        const file = e.target.files[0];
+        if (file && file.name.toLowerCase().includes('back')) {
+          showToast('Back GLB appears to be selected in the Front field. Loading to Front anyway.');
+        }
+        loadModelToSide('front', file);
+      };
+      document.getElementById('input-glb-back').onchange = e => {
+        const file = e.target.files[0];
+        if (file && file.name.toLowerCase().includes('front')) {
+          showToast('Front GLB appears to be selected in the Back field. Loading to Back anyway.');
+        }
+        loadModelToSide('back', file);
+      };
+      document.getElementById('input-media-0').onchange = e => loadMediaToSlot(0, e.target.files[0]);
+      document.getElementById('input-media-1').onchange = e => loadMediaToSlot(1, e.target.files[0]);
+      document.getElementById('seq-target-slot').onchange = e => {
+        inputSequence.targetSlot = parseInt(e.target.value, 10) || 0;
+        updateSequenceStatus();
+      };
+      document.getElementById('input-sequence-folder').onchange = e => handleSequenceFiles(Array.from(e.target.files || []));
+      document.getElementById('btn-seq-preview-first').onclick = previewFirstSequenceFrame;
+      document.getElementById('seq-start-frame').oninput = updateSequenceStatus;
+      document.getElementById('seq-end-frame').oninput = updateSequenceStatus;
+      document.getElementById('btn-seq-clear').onclick = clearInputSequence;
+      document.getElementById('btn-export-input-seq').onclick = exportLoadedImageSequenceZip;
+      document.getElementById('btn-select-output-folder').onclick = selectOutputFolder;
+      document.getElementById('btn-save-seq-direct').onclick = exportLoadedImageSequenceDirect;
+      document.getElementById('btn-stop-direct-save').onclick = stopDirectSave;
+
+      const bindPair = (base, key) => {
+        const s = document.getElementById(`${base}-s`);
+        const n = document.getElementById(`${base}-n`);
+        const handler = e => {
+          const val = parseFloat(e.target.value);
+          slots[activeSlot].config[key] = Number.isFinite(val) ? val : 0;
+          syncSlotUI();
+          updateSlotMaterial(activeSlot);
+        };
+        s.oninput = handler;
+        n.oninput = handler;
+      };
+      bindPair('uv-u', 'offsetU');
+      bindPair('uv-v', 'offsetV');
+      bindPair('uv-tu', 'tilingU');
+      bindPair('uv-tv', 'tilingV');
+
+      document.getElementById('mat-emissive-slider').oninput = e => {
+        slots[activeSlot].config.emissive = parseFloat(e.target.value);
+        document.getElementById('mat-emissive-num').value = e.target.value;
+        updateSlotMaterial(activeSlot);
+      };
+      document.getElementById('mat-emissive-num').oninput = e => {
+        slots[activeSlot].config.emissive = parseFloat(e.target.value);
+        document.getElementById('mat-emissive-slider').value = e.target.value;
+        updateSlotMaterial(activeSlot);
+      };
+      document.getElementById('mat-tint').oninput = e => {
+        slots[activeSlot].config.tint = e.target.value;
+        updateSlotMaterial(activeSlot);
+      };
+      document.getElementById('btn-flip-x').onclick = () => { slots[activeSlot].config.flipX = !slots[activeSlot].config.flipX; updateSlotMaterial(activeSlot); };
+      document.getElementById('btn-flip-y').onclick = () => { slots[activeSlot].config.flipY = !slots[activeSlot].config.flipY; updateSlotMaterial(activeSlot); };
+      document.getElementById('btn-rot').onclick = () => { slots[activeSlot].config.rot = (slots[activeSlot].config.rot + 1) % 4; updateSlotMaterial(activeSlot); };
+      document.getElementById('btn-wrap').onclick = () => { slots[activeSlot].config.wrap = !slots[activeSlot].config.wrap; updateSlotMaterial(activeSlot); };
+      document.getElementById('btn-reset-uv').onclick = () => {
+        Object.assign(slots[activeSlot].config, { offsetU: 0, offsetV: 0, tilingU: 1, tilingV: 1, flipX: false, flipY: false, rot: 0, wrap: false });
+        syncSlotUI();
+        updateSlotMaterial(activeSlot);
+      };
+
+      document.getElementById('btn-save-png').onclick = savePNG;
+      document.getElementById('btn-export-video').onclick = exportVideo;
+      document.getElementById('btn-export-pngseq').onclick = exportPNGSequenceZip;
+
+      [0, 1].forEach(idx => {
+        const el = document.getElementById(`drop-media-${idx}`);
+        el.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); el.classList.add('active-drop'); });
+        el.addEventListener('dragleave', e => { e.preventDefault(); e.stopPropagation(); el.classList.remove('active-drop'); });
+        el.addEventListener('drop', e => {
+          e.preventDefault(); e.stopPropagation();
+          el.classList.remove('active-drop');
+          document.getElementById('drop-overlay').classList.remove('active');
+          loadMediaToSlot(idx, e.dataTransfer.files[0]);
+        });
+      });
+
+      const overlay = document.getElementById('drop-overlay');
+      window.addEventListener('dragover', e => { e.preventDefault(); overlay.classList.add('active'); });
+      window.addEventListener('dragleave', e => { e.preventDefault(); if (e.relatedTarget === null) overlay.classList.remove('active'); });
+      window.addEventListener('drop', e => {
+        e.preventDefault();
+        overlay.classList.remove('active');
+        const files = Array.from(e.dataTransfer.files);
+        if (!files.length) return;
+        for (const file of files) {
+          const name = file.name.toLowerCase();
+          if (name.endsWith('.glb') || name.endsWith('.gltf')) {
+            if (name.includes('back')) loadModelToSide('back', file);
+            else if (name.includes('front')) loadModelToSide('front', file);
+            else loadModelToSide(activeSide, file);
+          } else if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+            loadMediaToSlot(activeSlot, file);
+          }
+        }
+      });
+    }
+
+    function getLoadedVideoElements() {
+      return slots
+        .filter(s => s.media.kind === 'video' && s.media.videoElement && Number.isFinite(s.media.videoElement.duration) && s.media.videoElement.duration > 0)
+        .map(s => s.media.videoElement);
+    }
+
+    function capturePlaybackStates(videos) {
+      return videos.map(v => ({ video: v, currentTime: v.currentTime, paused: v.paused, loop: v.loop, playbackRate: v.playbackRate }));
+    }
+
+    async function restorePlaybackStates(states) {
+      for (const st of states) {
+        const v = st.video;
+        v.loop = st.loop;
+        v.playbackRate = st.playbackRate;
+        await waitForSeek(v, st.currentTime);
+        if (st.paused) v.pause();
+        else { try { await v.play(); } catch (err) { console.warn(err); } }
+      }
+      slots.forEach((_, i) => updateTransportUI(i));
+    }
+
+    function waitForSeek(video, time = 0) {
+      return new Promise(resolve => {
+        if (!video || !Number.isFinite(video.duration)) { resolve(); return; }
+        const safeTime = Math.min(Math.max(time, 0), Math.max(video.duration - 0.02, 0));
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          video.removeEventListener('seeked', finish);
+          resolve();
+        };
+        video.pause();
+        video.addEventListener('seeked', finish, { once: true });
+        try { video.currentTime = safeTime; } catch (err) { finish(); }
+        setTimeout(finish, 1000);
+      });
+    }
+
+    function nextFrame() {
+      return new Promise(resolve => requestAnimationFrame(() => resolve()));
+    }
+
+    function normalizeFPS(fps) {
+      const presets = [24, 25, 29.97, 30, 50, 59.94, 60];
+      return presets.reduce((best, cur) => Math.abs(cur - fps) < Math.abs(best - fps) ? cur : best);
+    }
+
+    function average(values) {
+      return values.reduce((a, b) => a + b, 0) / values.length;
+    }
+
+    function estimateVideoFPS(video, sampleFrames = 50, timeoutMs = 2500) {
+      return new Promise(resolve => {
+        if (!video || typeof video.requestVideoFrameCallback !== 'function') { resolve(null); return; }
+        const deltas = [];
+        let last = null;
+        let done = false;
+        const timeout = setTimeout(() => {
+          if (done) return;
+          done = true;
+          resolve(deltas.length ? normalizeFPS(1 / average(deltas)) : null);
+        }, timeoutMs);
+        const cb = (now, meta) => {
+          if (done) return;
+          if (last !== null) {
+            const d = meta.mediaTime - last;
+            if (d > 0 && d < 0.2) deltas.push(d);
+          }
+          last = meta.mediaTime;
+          if (deltas.length >= sampleFrames) {
+            done = true;
+            clearTimeout(timeout);
+            resolve(normalizeFPS(1 / average(deltas)));
+            return;
+          }
+          video.requestVideoFrameCallback(cb);
+        };
+        video.requestVideoFrameCallback(cb);
+      });
+    }
+
+    async function getExportFPS() {
+      const sel = document.getElementById('export-fps').value;
+      if (sel !== 'auto') return parseFloat(sel);
+      const slotWithFps = slots.find(s => s.media.fps && s.media.kind === 'video');
+      return slotWithFps ? slotWithFps.media.fps : 30;
+    }
+
+    function getSupportedMimeType(format) {
+      if (!window.MediaRecorder) return '';
+      const candidates = format === 'mp4'
+        ? ['video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=avc1.4D401E', 'video/mp4;codecs=avc1.640028', 'video/mp4']
+        : ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+      return candidates.find(t => MediaRecorder.isTypeSupported(t)) || '';
+    }
+
+    function updateEncoderStatus() {
+      const webm = getSupportedMimeType('webm');
+      const mp4 = getSupportedMimeType('mp4');
+      const mp4Option = Array.from(document.getElementById('export-format').options).find(o => o.value === 'mp4');
+      if (mp4Option) mp4Option.disabled = !mp4;
+      document.getElementById('encoder-status').innerHTML = `WebM: ${webm ? '<span class="status-ok">supported</span>' : '<span class="status-bad">not supported</span>'}<br>MP4: ${mp4 ? '<span class="status-ok">supported</span>' : '<span class="status-warn">not supported / hidden by browser</span>'}`;
+    }
+
+    function renderActiveScene() {
+      renderer.render(sides[activeSide].scene, camera);
+    }
+
+    async function renderToPNGDataURL() {
+      const oldTarget = renderer.getRenderTarget();
+      const rt = new THREE.WebGLRenderTarget(TARGET_WIDTH, TARGET_HEIGHT, {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: THREE.RGBAFormat,
+        type: THREE.UnsignedByteType
+      });
+      rt.texture.colorSpace = THREE.SRGBColorSpace;
+
+      camera.aspect = TARGET_ASPECT;
+      camera.updateProjectionMatrix();
+      renderer.setRenderTarget(rt);
+      renderer.clear();
+      renderer.render(sides[activeSide].scene, camera);
+
+      const buffer = new Uint8ClampedArray(TARGET_WIDTH * TARGET_HEIGHT * 4);
+      renderer.readRenderTargetPixels(rt, 0, 0, TARGET_WIDTH, TARGET_HEIGHT, buffer);
+      renderer.setRenderTarget(oldTarget);
+      rt.dispose();
+
+      const canvas = document.createElement('canvas');
+      canvas.width = TARGET_WIDTH;
+      canvas.height = TARGET_HEIGHT;
+      const temp = document.createElement('canvas');
+      temp.width = TARGET_WIDTH;
+      temp.height = TARGET_HEIGHT;
+      temp.getContext('2d').putImageData(new ImageData(buffer, TARGET_WIDTH, TARGET_HEIGHT), 0, 0);
+      const ctx = canvas.getContext('2d');
+      ctx.save();
+      ctx.scale(1, -1);
+      ctx.drawImage(temp, 0, -TARGET_HEIGHT);
+      ctx.restore();
+      return canvas.toDataURL('image/png');
+    }
+
+    async function savePNG() {
+      const btn = document.getElementById('btn-save-png');
+      const old = btn.innerText;
+      try {
+        btn.disabled = true;
+        btn.innerText = '⏳ Rendering...';
+        const dataURL = await renderToPNGDataURL();
+        const link = document.createElement('a');
+        link.download = `Signage_${activeSide}_4728x5760_${Date.now()}.png`;
+        link.href = dataURL;
+        link.click();
+        showToast('PNG saved');
+      } catch (err) {
+        console.error(err);
+        showToast('PNG save failed');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = old;
+      }
+    }
+
+    async function exportVideo() {
+      if (isExporting) return;
+      if (!window.MediaRecorder) { showToast('MediaRecorder not supported. Use PNG sequence fallback.'); return; }
+
+      const format = document.getElementById('export-format').value;
+      let mimeType = getSupportedMimeType(format);
+      let finalFormat = format;
+      if (!mimeType && format === 'mp4') {
+        mimeType = getSupportedMimeType('webm');
+        finalFormat = 'webm';
+        if (mimeType) showToast('MP4 unsupported. Falling back to WebM.');
+      }
+      if (!mimeType) { showToast('No supported video encoder. Use PNG sequence fallback.'); return; }
+
+      const btn = document.getElementById('btn-export-video');
+      const oldSize = new THREE.Vector2();
+      renderer.getSize(oldSize);
+      const oldPixelRatio = renderer.getPixelRatio();
+      const videos = getLoadedVideoElements();
+      const states = capturePlaybackStates(videos);
+
+      try {
+        isExporting = true;
+        btn.disabled = true;
+        btn.innerText = '⏳ Exporting...';
+        const fps = await getExportFPS();
+        const bitrate = (parseFloat(document.getElementById('export-bitrate').value) || 40) * 1000 * 1000;
+        const duration = videos.length ? Math.max(...videos.map(v => v.duration || 0)) : parseFloat(document.getElementById('static-duration').value || '5');
+
+        setExportStatus(`Preparing ${finalFormat.toUpperCase()}...<br><strong>${TARGET_WIDTH} × ${TARGET_HEIGHT}</strong> / ${fps} fps / ${duration.toFixed(2)} sec<br>MIME: ${mimeType}`);
+
+        renderer.setPixelRatio(1);
+        renderer.setSize(TARGET_WIDTH, TARGET_HEIGHT, false);
+        camera.aspect = TARGET_ASPECT;
+        camera.updateProjectionMatrix();
+
+        for (const v of videos) {
+          await waitForSeek(v, 0);
+          v.loop = false;
+          v.playbackRate = 1;
+        }
+        renderActiveScene();
+        await nextFrame();
+
+        const stream = renderer.domElement.captureStream(fps);
+        const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: bitrate });
+        const chunks = [];
+        recorder.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+        const stopPromise = new Promise(resolve => recorder.onstop = resolve);
+        recorder.start(250);
+
+        for (const v of videos) { try { await v.play(); } catch (err) { console.warn(err); } }
+        const start = performance.now();
+        const timer = setInterval(() => {
+          const elapsed = (performance.now() - start) / 1000;
+          const pct = Math.min(100, elapsed / duration * 100).toFixed(1);
+          setExportStatus(`Recording... <strong>${pct}%</strong><br>${elapsed.toFixed(2)} / ${duration.toFixed(2)} sec`);
+        }, 250);
+
+        setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, Math.max(1, duration) * 1000 + 200);
+        await stopPromise;
+        clearInterval(timer);
+        stream.getVideoTracks().forEach(t => t.stop());
+
+        const ext = finalFormat === 'mp4' || mimeType.includes('mp4') ? 'mp4' : 'webm';
+        const blob = new Blob(chunks, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = `Signage_${activeSide}_4728x5760_${Date.now()}.${ext}`;
+        link.href = url;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        setExportStatus(`Done.<br><strong>${(blob.size / 1024 / 1024).toFixed(2)} MB</strong>`);
+        showToast(`${ext.toUpperCase()} export complete`);
+      } catch (err) {
+        console.error(err);
+        setExportStatus(`Video export failed.<br>${err.message || err}<br>Use PNG sequence fallback.`);
+        showToast('Video export failed');
+      } finally {
+        await restorePlaybackStates(states);
+        renderer.setPixelRatio(oldPixelRatio);
+        renderer.setSize(oldSize.x, oldSize.y, false);
+        camera.aspect = TARGET_ASPECT;
+        camera.updateProjectionMatrix();
+        isExporting = false;
+        btn.disabled = false;
+        btn.innerText = '🎬 Export Video 4728×5760';
+        resizeStage();
+      }
+    }
+
+    function canvasToBlob(canvas, type = 'image/png', quality) {
+      return new Promise(resolve => canvas.toBlob(resolve, type, quality));
+    }
+
+    async function renderCurrentFrameToPNGBlob() {
+      const dataURL = await renderToPNGDataURL();
+      const res = await fetch(dataURL);
+      return await res.blob();
+    }
+
+    async function exportPNGSequenceZip() {
+      if (isExporting) return;
+      const btn = document.getElementById('btn-export-pngseq');
+      const videos = getLoadedVideoElements();
+      const states = capturePlaybackStates(videos);
+      try {
+        isExporting = true;
+        btn.disabled = true;
+        btn.innerText = '⏳ ZIP Rendering...';
+        const fps = await getExportFPS();
+        const duration = videos.length ? Math.max(...videos.map(v => v.duration || 0)) : parseFloat(document.getElementById('static-duration').value || '5');
+        const maxFrames = Math.max(1, parseInt(document.getElementById('pngseq-max-frames').value || '120', 10));
+        const frameCount = Math.min(Math.ceil(duration * fps), maxFrames);
+        const zip = new JSZip();
+        const folder = zip.folder(`Signage_${activeSide}_4728x5760`);
+
+        for (const v of videos) {
+          v.loop = false;
+          v.pause();
+        }
+
+        for (let i = 0; i < frameCount; i++) {
+          const t = i / fps;
+          for (const v of videos) await waitForSeek(v, Math.min(t, Math.max(v.duration - 0.02, 0)));
+          await nextFrame();
+          const blob = await renderCurrentFrameToPNGBlob();
+          folder.file(`frame_${String(i).padStart(5, '0')}.png`, blob);
+          const pct = ((i + 1) / frameCount * 100).toFixed(1);
+          setExportStatus(`PNG sequence rendering... <strong>${pct}%</strong><br>${i + 1} / ${frameCount} frames`);
+        }
+
+        setExportStatus('Compressing ZIP...');
+        const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' }, meta => {
+          setExportStatus(`Compressing ZIP... <strong>${meta.percent.toFixed(1)}%</strong>`);
+        });
+        const url = URL.createObjectURL(zipBlob);
+        const link = document.createElement('a');
+        link.download = `Signage_${activeSide}_PNGSeq_4728x5760_${Date.now()}.zip`;
+        link.href = url;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        setExportStatus(`PNG sequence done.<br><strong>${frameCount}</strong> frames / ${(zipBlob.size / 1024 / 1024).toFixed(2)} MB`);
+        showToast('PNG sequence ZIP saved');
+      } catch (err) {
+        console.error(err);
+        setExportStatus(`PNG sequence failed.<br>${err.message || err}`);
+        showToast('PNG sequence export failed');
+      } finally {
+        await restorePlaybackStates(states);
+        isExporting = false;
+        btn.disabled = false;
+        btn.innerText = '🧩 Export PNG Sequence ZIP';
+        resizeStage();
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      if (!isExporting) renderActiveScene();
+      updateTransportUI(0);
+      updateTransportUI(1);
+    }
+
+    attachUIEvents();
+    syncSlotUI();
+    resizeStage();
+    updateEncoderStatus();
+    autoLoadGitHubAssets();
+    animate();
+  </script>
+</body>
+</html>
