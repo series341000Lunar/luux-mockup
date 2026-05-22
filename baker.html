@@ -524,10 +524,17 @@
       back: 'Baker_75f_Back_v1.glb'
     };
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      premultipliedAlpha: false,
+      preserveDrawingBuffer: true
+    });
     renderer.setPixelRatio(1);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.autoClear = true;
+    renderer.setClearColor(0x000000, 0);
+    renderer.setClearAlpha(0);
     container.appendChild(renderer.domElement);
 
     const camera = new THREE.PerspectiveCamera(CAMERA_FOV, TARGET_ASPECT, 0.01, 10000);
@@ -641,9 +648,11 @@
         color: new THREE.Color(1, 1, 1),
         transparent: true,
         opacity: 1,
+        alphaTest: 0,
         side: THREE.DoubleSide,
         depthTest: true,
-        depthWrite: true,
+        depthWrite: false,
+        premultipliedAlpha: false,
         toneMapped: false
       });
       mat.userData.isBakerScreenMaterial = true;
@@ -885,6 +894,12 @@
             mesh.material = createUnlitMaterial(slot);
           }
           const mat = mesh.material;
+          mat.transparent = true;
+          mat.opacity = 1;
+          mat.alphaTest = 0;
+          mat.depthWrite = false;
+          mat.premultipliedAlpha = false;
+          mat.blending = THREE.NormalBlending;
           if (tex) {
             tex.flipY = false;
             tex.center.set(0.5, 0.5);
@@ -1100,25 +1115,84 @@
       if (slot.media.videoElement) slot.media.videoElement.loop = slot.config.loop;
     };
 
-    async function ensureWebcam() {
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error('getUserMedia not supported');
+    function ensureWebcamTexture() {
       if (!webcamTexture) {
         webcamTexture = new THREE.VideoTexture(webcamVideo);
         webcamTexture.colorSpace = THREE.SRGBColorSpace;
         webcamTexture.minFilter = THREE.LinearFilter;
         webcamTexture.magFilter = THREE.LinearFilter;
         webcamTexture.flipY = false;
+        webcamTexture.needsUpdate = true;
       }
-      if (!webcamVideo.srcObject) {
-        const devicesGranted = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        devicesGranted.getTracks().forEach(t => t.stop());
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        document.getElementById('cam-device-select').innerHTML = devices
-          .filter(d => d.kind === 'videoinput')
-          .map(d => `<option value="${d.deviceId}">${d.label || 'Camera ' + d.deviceId}</option>`)
-          .join('');
-        await changeWebcamSource();
+      return webcamTexture;
+    }
+
+    function stopCurrentWebcamStream() {
+      if (webcamVideo.srcObject) {
+        webcamVideo.srcObject.getTracks().forEach(t => t.stop());
+        webcamVideo.srcObject = null;
       }
+    }
+
+    function cameraErrorMessage(err) {
+      const name = err?.name || 'CameraError';
+      const msg = err?.message || String(err || 'unknown error');
+      return `${name}: ${msg}`;
+    }
+
+    async function refreshCameraDeviceList(preferredDeviceId = '') {
+      const select = document.getElementById('cam-device-select');
+      if (!navigator.mediaDevices?.enumerateDevices || !select) return;
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cams = devices.filter(d => d.kind === 'videoinput');
+      select.innerHTML = cams.length
+        ? cams.map((d, i) => `<option value="${d.deviceId}">${d.label || 'Camera ' + (i + 1)}</option>`).join('')
+        : '<option value="">Default camera</option>';
+
+      if (preferredDeviceId && cams.some(d => d.deviceId === preferredDeviceId)) {
+        select.value = preferredDeviceId;
+      } else {
+        const currentTrack = webcamVideo.srcObject?.getVideoTracks?.()[0];
+        const currentDeviceId = currentTrack?.getSettings?.().deviceId;
+        if (currentDeviceId && cams.some(d => d.deviceId === currentDeviceId)) select.value = currentDeviceId;
+      }
+    }
+
+    async function startWebcamStream(deviceId = '') {
+      ensureWebcamTexture();
+      stopCurrentWebcamStream();
+
+      const exactConstraints = deviceId
+        ? { video: { deviceId: { exact: deviceId } }, audio: false }
+        : { video: { width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false };
+
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(exactConstraints);
+      } catch (err) {
+        // Some capture devices reject exact deviceId or ideal resolution.
+        // Fallback to the browser default camera before reporting failure.
+        if (deviceId || err?.name === 'OverconstrainedError') {
+          console.warn('Camera exact/ideal constraint failed. Retrying default camera:', err);
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        } else {
+          throw err;
+        }
+      }
+
+      webcamVideo.srcObject = stream;
+      webcamVideo.muted = true;
+      webcamVideo.playsInline = true;
+      await webcamVideo.play();
+      webcamTexture.needsUpdate = true;
+      return stream;
+    }
+
+    async function ensureWebcam() {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('getUserMedia not supported in this browser/context');
+      ensureWebcamTexture();
+      if (!webcamVideo.srcObject) await startWebcamStream('');
+      await refreshCameraDeviceList();
       document.getElementById('cam-selector-ui').style.display = 'block';
     }
 
@@ -1142,24 +1216,32 @@
         showToast(`Slot ${slot.label}: webcam source`);
       } catch (err) {
         console.error(err);
-        showToast('Camera access failed or denied.');
+        const msg = cameraErrorMessage(err);
+        setExportStatus(`Camera failed.<br>${msg}`);
+        showToast(`Camera failed: ${err?.name || 'unknown'}`);
       }
     };
 
     window.changeWebcamSource = async () => {
-      const deviceId = document.getElementById('cam-device-select').value;
-      if (webcamVideo.srcObject) {
-        webcamVideo.srcObject.getTracks().forEach(t => t.stop());
-        webcamVideo.srcObject = null;
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: deviceId ? { deviceId: { exact: deviceId } } : true,
-        audio: false
-      });
-      webcamVideo.srcObject = stream;
-      await webcamVideo.play();
-      for (let i = 0; i < 2; i++) {
-        if (slots[i].media.kind === 'webcam') updateSlotMaterial(i);
+      const select = document.getElementById('cam-device-select');
+      const deviceId = select?.value || '';
+      try {
+        await startWebcamStream(deviceId);
+        await refreshCameraDeviceList(deviceId);
+        for (let i = 0; i < 2; i++) {
+          if (slots[i].media.kind === 'webcam') {
+            slots[i].media.texture = webcamTexture;
+            slots[i].media.videoElement = webcamVideo;
+            updateSlotMaterial(i);
+            updateMediaStatus(i);
+          }
+        }
+        showToast('Camera source changed');
+      } catch (err) {
+        console.error(err);
+        const msg = cameraErrorMessage(err);
+        setExportStatus(`Camera source change failed.<br>${msg}`);
+        showToast(`Camera failed: ${err?.name || 'unknown'}`);
       }
     };
 
@@ -1170,8 +1252,7 @@
     function updateWebcamLifeCycle() {
       const inUse = slots.some(s => s.media.kind === 'webcam');
       if (!inUse && webcamVideo.srcObject) {
-        webcamVideo.srcObject.getTracks().forEach(t => t.stop());
-        webcamVideo.srcObject = null;
+        stopCurrentWebcamStream();
       }
     }
 
@@ -1803,28 +1884,44 @@
     }
 
     function renderActiveScene() {
+      renderer.setClearColor(0x000000, 0);
+      renderer.setClearAlpha(0);
+      renderer.clear(true, true, true);
       renderer.render(sides[activeSide].scene, camera);
     }
 
     async function renderToPNGDataURL() {
       const oldTarget = renderer.getRenderTarget();
+      const oldClearColor = new THREE.Color();
+      renderer.getClearColor(oldClearColor);
+      const oldClearAlpha = renderer.getClearAlpha();
+      const oldAutoClear = renderer.autoClear;
+
       const rt = new THREE.WebGLRenderTarget(TARGET_WIDTH, TARGET_HEIGHT, {
         minFilter: THREE.LinearFilter,
         magFilter: THREE.LinearFilter,
         format: THREE.RGBAFormat,
-        type: THREE.UnsignedByteType
+        type: THREE.UnsignedByteType,
+        depthBuffer: true,
+        stencilBuffer: false
       });
       rt.texture.colorSpace = THREE.SRGBColorSpace;
 
       camera.aspect = TARGET_ASPECT;
       camera.updateProjectionMatrix();
       renderer.setRenderTarget(rt);
-      renderer.clear();
+      renderer.autoClear = true;
+      renderer.setClearColor(0x000000, 0);
+      renderer.setClearAlpha(0);
+      renderer.clear(true, true, true);
       renderer.render(sides[activeSide].scene, camera);
 
       const buffer = new Uint8ClampedArray(TARGET_WIDTH * TARGET_HEIGHT * 4);
       renderer.readRenderTargetPixels(rt, 0, 0, TARGET_WIDTH, TARGET_HEIGHT, buffer);
       renderer.setRenderTarget(oldTarget);
+      renderer.setClearColor(oldClearColor, oldClearAlpha);
+      renderer.setClearAlpha(oldClearAlpha);
+      renderer.autoClear = oldAutoClear;
       rt.dispose();
 
       const canvas = document.createElement('canvas');
@@ -1835,6 +1932,7 @@
       temp.height = TARGET_HEIGHT;
       temp.getContext('2d').putImageData(new ImageData(buffer, TARGET_WIDTH, TARGET_HEIGHT), 0, 0);
       const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, TARGET_WIDTH, TARGET_HEIGHT);
       ctx.save();
       ctx.scale(1, -1);
       ctx.drawImage(temp, 0, -TARGET_HEIGHT);
