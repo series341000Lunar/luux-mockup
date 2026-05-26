@@ -609,6 +609,7 @@
             <div class="control-label">Export FPS</div>
             <select id="export-fps">
                 <option value="auto">Auto from video</option>
+                <option value="10">10</option>
                 <option value="24">24</option>
                 <option value="29.97">29.97</option>
                 <option value="30">30</option>
@@ -650,8 +651,57 @@
         <div id="export-status" class="status-box">Ready.</div>
 
         <div class="divider"></div>
+
+        <h3>JPG Sequence Direct Save</h3>
+
+        <div class="control-group">
+            <div class="control-label">Sequence FPS</div>
+            <select id="jpgseq-fps">
+                <option value="auto">Auto from video</option>
+                <option value="10">10</option>
+                <option value="24">24</option>
+                <option value="29.97">29.97</option>
+                <option value="30" selected>30</option>
+                <option value="59.94">59.94</option>
+                <option value="60">60</option>
+            </select>
+            <div class="hint">프레임별 seek → render → JPG 저장 방식입니다. 정교한 타이밍 확인용입니다.</div>
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">Frame Range</div>
+            <div class="slider-row">
+                <input class="num-small" type="number" id="jpgseq-start-frame" min="0" step="1" value="0">
+                <span style="color:#777; font-size:11px;">to</span>
+                <input class="num-small" type="number" id="jpgseq-end-frame" min="0" step="1" value="120">
+            </div>
+            <div class="hint">0-based frame range. 예: 0 to 120</div>
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">JPG Quality</div>
+            <input type="number" id="jpgseq-quality" min="0.1" max="1.0" step="0.05" value="0.95">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">Export Resolution</div>
+            <select id="jpgseq-size">
+                <option value="1280x853">1280 x 853</option>
+                <option value="1920x1280" selected>1920 x 1280</option>
+                <option value="3000x2000">3000 x 2000</option>
+                <option value="stage">Current Preview Size</option>
+            </select>
+        </div>
+
+        <button id="btn-select-jpgseq-folder" class="primary-blue" style="width:100%;">📁 Select Output Folder</button>
+        <button id="btn-save-jpgseq-direct" class="primary-green" style="width:100%; margin-top:6px;">🧩 Save JPG Sequence Direct</button>
+        <button id="btn-stop-jpgseq" class="primary-red" style="width:100%; margin-top:6px;" disabled>Stop</button>
+
+        <div id="jpgseq-status" class="status-box">Ready.</div>
+
+        <div class="divider"></div>
         <div style="font-size: 10px; color:#666; text-align: center; line-height:1.45;">
-            2026 / LEE JUNGHO / LUNARGRAPHICS / ChannelA B&amp;C<br>
+            2026 / LEE JUNGHO / ChannelA B&amp;C<br>
             V7.1 Video / MP4 Export Edition
         </div>
     </div>
@@ -691,7 +741,7 @@
         const renderer = new THREE.WebGLRenderer({
             antialias: true,
             alpha: true,
-            preserveDrawingBuffer: true
+            preserveDrawingBuffer: false
         });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -811,6 +861,10 @@
         let bgMesh = null;
         let sharedVideoTexture = null;
         let isExporting = false;
+        let currentExportRenderFps = 0;
+        let lastExportRenderTime = 0;
+        let jpgSeqOutputDirHandle = null;
+        let jpgSeqStopRequested = false;
         let exportAudioContext = null;
         let exportAudioDestination = null;
         const audioSourceMap = new WeakMap();
@@ -1909,6 +1963,247 @@
             return new Promise(resolve => requestAnimationFrame(() => resolve()));
         }
 
+        async function selectJpgSeqOutputFolder() {
+            if (!window.showDirectoryPicker) {
+                showToast('이 브라우저는 폴더 직접 저장을 지원하지 않습니다. Chrome/Edge + HTTPS 또는 localhost를 사용하세요.');
+                return;
+            }
+
+            try {
+                jpgSeqOutputDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                document.getElementById('jpgseq-status').innerHTML = 'Output folder selected.<br>Ready for direct JPG sequence save.';
+                showToast('JPG sequence output folder selected');
+            } catch (err) {
+                console.warn(err);
+                showToast('Output folder selection cancelled or denied');
+            }
+        }
+
+        function getJpgSeqSize() {
+            const value = document.getElementById('jpgseq-size').value;
+
+            if (value === 'stage') {
+                const size = new THREE.Vector2();
+                renderer.getSize(size);
+                return {
+                    w: Math.round(size.x),
+                    h: Math.round(size.y)
+                };
+            }
+
+            const [w, h] = value.split('x').map(Number);
+            return { w, h };
+        }
+
+        async function getJpgSeqFPS() {
+            const selected = document.getElementById('jpgseq-fps').value;
+            if (selected !== 'auto') return parseFloat(selected);
+
+            const slotWithFps = slots.find(s => s.sourceFps && s.videoElement);
+            if (slotWithFps) return slotWithFps.sourceFps;
+
+            const videos = getLoadedVideos();
+            if (videos[0]) {
+                const fps = await estimateVideoFPS(videos[0], 60, 2500);
+                return fps || 30;
+            }
+
+            return 30;
+        }
+
+        async function renderCurrentViewToCanvas(w, h) {
+            const oldAspect = camera.aspect;
+
+            const rt = new THREE.WebGLRenderTarget(w, h, {
+                minFilter: THREE.LinearFilter,
+                magFilter: THREE.LinearFilter,
+                format: THREE.RGBAFormat,
+                type: THREE.UnsignedByteType
+            });
+            rt.texture.colorSpace = THREE.SRGBColorSpace;
+
+            camera.aspect = w / h;
+            updateCameraBackgroundPlane();
+            updateCameraProjection();
+
+            renderer.setRenderTarget(rt);
+            renderer.clear();
+            renderer.render(scene, camera);
+
+            const buffer = new Uint8ClampedArray(w * h * 4);
+            renderer.readRenderTargetPixels(rt, 0, 0, w, h, buffer);
+
+            renderer.setRenderTarget(null);
+            camera.aspect = oldAspect;
+            updateCameraBackgroundPlane();
+            updateCameraProjection();
+            rt.dispose();
+
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = w;
+            tempCanvas.height = h;
+            tempCanvas.getContext('2d').putImageData(new ImageData(buffer, w, h), 0, 0);
+
+            ctx.save();
+            ctx.scale(1, -1);
+            ctx.drawImage(tempCanvas, 0, -h);
+            ctx.restore();
+
+            return canvas;
+        }
+
+        function canvasToJpgBlob(canvas, quality = 0.95) {
+            return new Promise(resolve => {
+                canvas.toBlob(blob => resolve(blob), 'image/jpeg', quality);
+            });
+        }
+
+        async function writeBlobToOutputFolder(filename, blob) {
+            if (!jpgSeqOutputDirHandle) {
+                throw new Error('Output folder is not selected.');
+            }
+
+            const fileHandle = await jpgSeqOutputDirHandle.getFileHandle(filename, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+        }
+
+        async function seekAllVideosToTime(videos, time) {
+            for (const video of videos) {
+                if (!video || !Number.isFinite(video.duration)) continue;
+
+                const safeTime = Math.min(
+                    Math.max(time, 0),
+                    Math.max(video.duration - 0.02, 0)
+                );
+
+                await waitForSeek(video, safeTime);
+            }
+
+            await nextFrame();
+            await nextFrame();
+        }
+
+        async function saveJpgSequenceDirect() {
+            if (isExporting) return;
+
+            if (!jpgSeqOutputDirHandle) {
+                showToast('Select output folder first.');
+                return;
+            }
+
+            const videos = getLoadedVideos();
+            if (!videos.length) {
+                showToast('No video texture loaded.');
+                return;
+            }
+
+            const btn = document.getElementById('btn-save-jpgseq-direct');
+            const stopBtn = document.getElementById('btn-stop-jpgseq');
+
+            const oldSize = new THREE.Vector2();
+            renderer.getSize(oldSize);
+            const oldPixelRatio = renderer.getPixelRatio();
+            const oldAspect = camera.aspect;
+            const playbackStates = capturePlaybackStates(videos);
+
+            try {
+                isExporting = true;
+                jpgSeqStopRequested = false;
+                currentExportRenderFps = 0;
+                lastExportRenderTime = 0;
+
+                btn.disabled = true;
+                stopBtn.disabled = false;
+                btn.innerText = '⏳ Saving JPG Sequence...';
+
+                const { w, h } = getJpgSeqSize();
+                const fps = await getJpgSeqFPS();
+
+                const startFrame = Math.max(
+                    0,
+                    parseInt(document.getElementById('jpgseq-start-frame').value || '0', 10)
+                );
+                const endFrame = Math.max(
+                    startFrame,
+                    parseInt(document.getElementById('jpgseq-end-frame').value || String(startFrame), 10)
+                );
+                const quality = Math.min(
+                    Math.max(parseFloat(document.getElementById('jpgseq-quality').value || '0.95'), 0.1),
+                    1.0
+                );
+
+                for (const video of videos) {
+                    video.pause();
+                    video.loop = false;
+                }
+
+                renderer.setPixelRatio(1);
+                renderer.setSize(w, h, false);
+                camera.aspect = w / h;
+                updateCameraBackgroundPlane();
+                updateCameraProjection();
+
+                for (let frame = startFrame; frame <= endFrame; frame++) {
+                    if (jpgSeqStopRequested) break;
+
+                    const time = frame / fps;
+                    await seekAllVideosToTime(videos, time);
+
+                    const canvas = await renderCurrentViewToCanvas(w, h);
+                    const blob = await canvasToJpgBlob(canvas, quality);
+                    if (!blob) throw new Error('Failed to create JPG blob.');
+
+                    const filename = `Signage_${activeSceneType}_${String(frame).padStart(5, '0')}.jpg`;
+                    await writeBlobToOutputFolder(filename, blob);
+
+                    const pct = ((frame - startFrame + 1) / (endFrame - startFrame + 1) * 100).toFixed(1);
+                    document.getElementById('jpgseq-status').innerHTML =
+                        `Saving JPG sequence... <strong>${pct}%</strong><br>` +
+                        `Frame ${frame} / ${endFrame}<br>` +
+                        `${filename}`;
+
+                    await nextFrame();
+                }
+
+                document.getElementById('jpgseq-status').innerHTML =
+                    jpgSeqStopRequested
+                        ? 'JPG sequence save stopped.'
+                        : `JPG sequence save done.<br>${startFrame} to ${endFrame}`;
+
+                showToast(jpgSeqStopRequested ? 'JPG sequence save stopped' : 'JPG sequence saved');
+            } catch (err) {
+                console.error(err);
+                document.getElementById('jpgseq-status').innerHTML =
+                    `JPG sequence save failed.<br>${err.message || err}`;
+                showToast('JPG sequence save failed');
+            } finally {
+                await restorePlaybackStates(playbackStates);
+
+                renderer.setPixelRatio(oldPixelRatio);
+                renderer.setSize(oldSize.x, oldSize.y, false);
+                camera.aspect = oldAspect;
+                updateCameraBackgroundPlane();
+                updateCameraProjection();
+                resizeStage();
+
+                isExporting = false;
+                jpgSeqStopRequested = false;
+                currentExportRenderFps = 0;
+                lastExportRenderTime = 0;
+
+                btn.disabled = false;
+                stopBtn.disabled = true;
+                btn.innerText = '🧩 Save JPG Sequence Direct';
+            }
+        }
+
         async function exportWebM() {
             if (isExporting) return;
 
@@ -1944,6 +2239,9 @@
             try {
                 const { w, h } = getExportSize();
                 const fps = await getExportFPS();
+                currentExportRenderFps = fps;
+                lastExportRenderTime = 0;
+
                 const bitrateMbps = parseFloat(document.getElementById('export-bitrate').value) || 16;
                 const bitrate = bitrateMbps * 1000 * 1000;
                 const duration = videos.length
@@ -1960,6 +2258,7 @@
 
                 for (const video of videos) await waitForSeek(video, 0);
                 renderer.render(scene, camera);
+                lastExportRenderTime = performance.now();
                 await nextFrame();
 
                 const stream = renderer.domElement.captureStream(fps);
@@ -2031,12 +2330,20 @@
                 resizeStage();
 
                 isExporting = false;
+                currentExportRenderFps = 0;
+                lastExportRenderTime = 0;
                 btn.disabled = false;
                 btn.innerText = '🎬 Export Video';
             }
         }
 
         document.getElementById('btn-export-webm').onclick = exportWebM;
+        document.getElementById('btn-select-jpgseq-folder').onclick = selectJpgSeqOutputFolder;
+        document.getElementById('btn-save-jpgseq-direct').onclick = saveJpgSequenceDirect;
+        document.getElementById('btn-stop-jpgseq').onclick = () => {
+            jpgSeqStopRequested = true;
+            document.getElementById('jpgseq-status').innerHTML = 'Stop requested. Waiting for current frame...';
+        };
 
         async function renderHighRes() {
             const scaleOpt = document.getElementById('save-scale').value;
@@ -2119,7 +2426,19 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            renderer.render(scene, camera);
+
+            if (isExporting && currentExportRenderFps > 0) {
+                const now = performance.now();
+                const frameInterval = 1000 / currentExportRenderFps;
+
+                if (lastExportRenderTime === 0 || now - lastExportRenderTime >= frameInterval) {
+                    renderer.render(scene, camera);
+                    lastExportRenderTime = now;
+                }
+            } else {
+                renderer.render(scene, camera);
+            }
+
             updateAllTransportUI();
         }
 
